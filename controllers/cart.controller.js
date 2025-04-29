@@ -54,7 +54,7 @@ cartController.addToCart = async (req, res) => {
                 price,
                 totalPrice: discountedPrice * parseInt(quantity)
             });
-        }
+        } 
 
         // Update cart total
         const cartItems = await CartItem.findAll({

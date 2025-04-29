@@ -9,14 +9,7 @@ const nodemailer = require('nodemailer');
 
 const userController = {};
 
-// Configure nodemailer
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+
 
 userController.register = async (req, res) => {
     try {
@@ -29,7 +22,7 @@ userController.register = async (req, res) => {
             }
         });
 
-        if (existingUser && existingUser.isVerified) {
+        if (existingUser) {
             return res.error(
                 HttpStatus.BAD_REQUEST,
                 "false",
@@ -38,111 +31,46 @@ userController.register = async (req, res) => {
             );
         }
 
-        // Generate OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        
-
-       //for testing only
-        console.log(`TEST MODE - OTP for testing: ${otp}`);
-
-
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create or update user with unverified status
-        const [user, created] = await User.findOrCreate({
-            where: { email },
-            defaults: {
-                name,
-                email,
-                phone_number,
-                password: hashedPassword,
-                role: 'customer',
-                isVerified: false
-            }
+        // Create user with verified status
+        const user = await User.create({
+            name,
+            email,
+            phone_number,
+            password: hashedPassword,
+            role: 'customer',
+            isVerified: true // Set to true by default
         });
 
-        // Store OTP
-        await OtpVerification.create({  
-            userId: user.id,
-            otp: otp,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000)
-        });
+        // Generate JWT token for immediate login
+        const token = jwt.sign(
+            { 
+                id: user.id,
+                email: user.email,
+                role: user.role 
+            },
+            process.env.APP_SUPER_SECRET_KEY,
+            { expiresIn: '24h' }
+        );
 
-        // Temporarily skip email sending for testing
-        /*
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Email Verification OTP',
-            text: `Your OTP for email verification is: ${otp}. Valid for 10 minutes.`
-        };
-
-        await transporter.sendMail(mailOptions);
-        */
+        // Remove password from response
+        const userResponse = user.toJSON();
+        delete userResponse.password;
 
         return res.success(
-            HttpStatus.OK,
+            HttpStatus.CREATED,
             "true",
-            "OTP sent to email for verification",
-            { email }
+            "Registration successful",
+            {
+                user: userResponse,
+                token
+            }
         );
 
     } catch (error) {
         console.error("Error in registration:", error);
-        return res.error(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "false",
-            ResponseMessages.INTERNAL_SERVER_ERROR,
-            error
-        );
-    }
-};
-
-userController.verifyOTP = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-
-        const user = await User.findOne({ where: { email } });  
-        if (!user) {
-            return res.error(
-                HttpStatus.NOT_FOUND,
-                "false",
-                "User not found",
-                []
-            );
-        }
-
-        const otpRecord = await OtpVerification.findOne({  
-            where: {
-                userId: user.id,
-                otp: otp,
-                expiresAt: { [Op.gt]: new Date() }
-            }
-        });
-
-        if (!otpRecord) {
-            return res.error(
-                HttpStatus.BAD_REQUEST,
-                "false",
-                "Invalid or expired OTP",
-                []
-            );
-        }
-
-        // Update user verification status
-        await user.update({ isVerified: true });
-        await otpRecord.destroy();
-
-        return res.success(
-            HttpStatus.OK,
-            "true",
-            "Email verified successfully",
-            { email }
-        );
-
-    } catch (error) {
-        console.error("Error in OTP verification:", error);
         return res.error(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "false",
