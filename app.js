@@ -5,10 +5,10 @@ const sendResponse = require('./middlewares/response.middleware');
 const handleNotFound = require('./middlewares/notFound.middleware');
 const errorHandler = require('./middlewares/errorHandler.middleware');
 const userRoutes = require('./routes/user.routes');
-const mealRoutes=require('./routes/meal.routes');
-const cartRoutes=require('./routes/cart.routes');
-const addressRoutes = require('./routes/address.routes');
 const adminRoutes = require('./routes/admin.routes');
+const vendorRoutes = require('./routes/vendor.routes');
+const seedAdmin = require('./seeders/adminSeeder');
+
 const cors = require('cors');
 
 const app = express();
@@ -23,10 +23,8 @@ app.use(sendResponse);
 
 // Routes
 app.use('/api/users', userRoutes);
-app.use('/api/meals',mealRoutes);
-app.use('/api/cart',cartRoutes);
-app.use('/api/addresses',addressRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/vendors', vendorRoutes);
 
 // Error handling middlewares
 app.use(handleNotFound);
@@ -39,8 +37,12 @@ async function startServer() {
         console.log('Database connection established successfully.');
         
         // sync models
-        await sequelize.sync({ force:false });
+        await sequelize.sync({ force: false });
         console.log('Database tables synced successfully.');
+        
+        // Seed admin user
+        await seedAdmin();
+        console.log('Admin seeding completed.');
 
         // Finally start the server
         app.listen(port, () => {

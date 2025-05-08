@@ -1,28 +1,31 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
+const Vendor = require('./vendor.model');
 
-const otpVerification = sequelize.define('otp_verification', {
+const MenuPhoto = sequelize.define('menuPhotos', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true
     },
-    userId: {
+    vendorId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'users',
+            model: Vendor,
             key: 'id'
         }
     },
-    otp: {
+    photoUrl: {
         type: DataTypes.STRING,
         allowNull: false
-    },
-    expiresAt: {
-        type: DataTypes.DATE,
-        allowNull: false
     }
+}, {
+    timestamps: true
 });
 
-module.exports = otpVerification;
+// Define relationship
+Vendor.hasMany(MenuPhoto, { foreignKey: 'vendorId' });
+MenuPhoto.belongsTo(Vendor, { foreignKey: 'vendorId' });
+
+module.exports = MenuPhoto;

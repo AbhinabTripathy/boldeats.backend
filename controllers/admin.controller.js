@@ -123,15 +123,15 @@ adminController.getOrders = async (req, res) => {
             {
                 id: "ORD001",
                 customerName: "Rajesh Kumar",
-                address: "42, Nehru Street, Chennai, Tamil Nadu",
+                address: "42, Saheed Nagar, Bhubaneswar, Odisha",
                 paymentMode: "UPI",
                 price: 99,
                 status: "Delivered"
             },
             {
                 id: "ORD002",
-                customerName: "Priya Sharma",
-                address: "15, MG Road, Bangalore, Karnataka",
+                customerName: "Nikita Sharma",
+                address: "15,Jaydev Vihar, Bhubaneswar, Odisha",
                 paymentMode: "Card",
                 price: 198,
                 status: "Processing"
@@ -164,7 +164,7 @@ adminController.getOrderDetails = async (req, res) => {
         const order = {
             id: id,
             customerName: "Rajesh Kumar",
-            address: "42, Nehru Street, Chennai, Tamil Nadu",
+            address: "15,Jaydev Vihar, Bhubaneswar, Odisha",
             paymentMode: "UPI",
             price: 99,
             status: "Delivered",
@@ -205,7 +205,7 @@ adminController.updateOrderStatus = async (req, res) => {
         const order = {
             id: id,
             customerName: "Rajesh Kumar",
-            address: "42, Nehru Street, Chennai, Tamil Nadu",
+            address: "15,Jaydev Vihar, Bhubaneswar, Odisha",
             paymentMode: "UPI",
             price: 99,
             status: status,
