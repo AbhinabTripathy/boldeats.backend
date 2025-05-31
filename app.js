@@ -7,6 +7,13 @@ const errorHandler = require('./middlewares/errorHandler.middleware');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const vendorRoutes = require('./routes/vendor.routes');
+const cartRoutes = require('./routes/cart.routes');
+const addressRoutes = require('./routes/address.routes');
+const paymentRoutes = require('./routes/payment.routes');
+
+
+
+
 const seedAdmin = require('./seeders/adminSeeder');
 const path = require('path');
 const cors = require('cors');
@@ -35,6 +42,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/vendors', vendorRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/addresses', addressRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Error handling middlewares
 app.use(handleNotFound);
@@ -51,6 +61,7 @@ async function startServer() {
             // Temporarily disable foreign key checks
             await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
             
+            // Change alter to false to prevent automatic schema changes
             await sequelize.sync({ force: false, alter: false });
             console.log('Database tables synced successfully.');
             

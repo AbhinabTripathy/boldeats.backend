@@ -1,19 +1,30 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
-const { User, OtpVerification } = require('../models');  
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
+const { User, Vendor, MenuItem, MenuPhoto } = require('../models');
 
 const userController = {};
 
 
 
+// Register a user
 userController.register = async (req, res) => {
     try {
         const { name, email, phone_number, password } = req.body;
+
+        // Validate required fields
+        if (!name || !email || !phone_number || !password) {
+            return res.error(
+                HttpStatus.BAD_REQUEST,
+                "false",
+                "All fields are required",
+                []
+            );
+        }
 
         // Check if user already exists
         const existingUser = await User.findOne({  
@@ -26,7 +37,7 @@ userController.register = async (req, res) => {
             return res.error(
                 HttpStatus.BAD_REQUEST,
                 "false",
-                ResponseMessages.User_Exist,
+                "User with this email or phone number already exists",
                 []
             );
         }
@@ -80,6 +91,7 @@ userController.register = async (req, res) => {
     }
 };
 
+// Update the login function to handle both email and phone number login
 userController.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -89,15 +101,20 @@ userController.login = async (req, res) => {
             return res.error(
                 HttpStatus.BAD_REQUEST,
                 "false",
-                "Email and password are required",
+                "Email/Phone and password are required",
                 []
             );
         }
 
-        // Find user by email
+        // Find user by email or phone number
         const user = await User.findOne({ 
-            where: { email },
-            attributes: ['id', 'name', 'email', 'password', 'role', 'isVerified'] 
+            where: {
+                [Op.or]: [
+                    { email: email },
+                    { phone_number: email } // Allow login with phone number too
+                ]
+            },
+            attributes: ['id', 'name', 'email', 'phone_number', 'password', 'role', 'isVerified', 'wallet_balance'] 
         });
 
         if (!user) {
@@ -114,7 +131,7 @@ userController.login = async (req, res) => {
             return res.error(
                 HttpStatus.UNAUTHORIZED,
                 "false",
-                "Please verify your email first",
+                "Please verify your account first",
                 []
             );
         }
@@ -165,7 +182,7 @@ userController.login = async (req, res) => {
         );
     }
 };
-//get profile data........................................
+//get profile data.......................................
 userController.getProfile = async (req, res) => {
     try {
         const userId = req.user.id; 
@@ -271,6 +288,96 @@ userController.updateProfile = async (req, res) => {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "false",
             ResponseMessages.INTERNAL_SERVER_ERROR,
+            error
+        );
+    }
+};
+
+// Get all vendors with their menu items
+userController.getAllVendors = async (req, res) => {
+    try {
+        const vendors = await Vendor.findAll({
+            include: [{
+                model: MenuItem,
+                include: [MenuPhoto]
+            }],
+            attributes: [
+                'id', 'name', 'logo', 'phoneNumber', 'address',
+                'fssaiNumber', 'yearsInBusiness', 'openingTime',
+                'closingTime', 'menuType', 'rating',
+                'subscriptionPrice15Days', 'subscriptionPriceMonthly',
+                'mealTypes'
+            ]
+        });
+
+        return res.success(
+            HttpStatus.OK,
+            "true",
+            "Vendors fetched successfully",
+            vendors
+        );
+    } catch (error) {
+        console.error('Error fetching vendors:', error);
+        return res.error(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "false",
+            "Error fetching vendors",
+            error
+        );
+    }
+};
+
+// Get vendor details by ID
+userController.getVendorDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const vendor = await Vendor.findOne({
+            where: { id },
+            include: [{
+                model: MenuItem,
+                include: [MenuPhoto]
+            }],
+            attributes: [
+                'id', 'name', 'logo', 'phoneNumber', 'address',
+                'fssaiNumber', 'yearsInBusiness', 'openingTime',
+                'closingTime', 'menuType', 'rating',
+                'subscriptionPrice15Days', 'subscriptionPriceMonthly',
+                'mealTypes'
+            ]
+        });
+
+        if (!vendor) {
+            return res.error(
+                HttpStatus.NOT_FOUND,
+                "false",
+                "Vendor not found"
+            );
+        }
+
+        // Parse mealTypes if it's a string
+        const vendorData = vendor.toJSON();
+        if (typeof vendorData.mealTypes === 'string') {
+            try {
+                vendorData.mealTypes = JSON.parse(vendorData.mealTypes);
+            } catch (e) {
+                console.error('Error parsing mealTypes:', e);
+                // Keep as is if parsing fails
+            }
+        }
+
+        return res.success(
+            HttpStatus.OK,
+            "true",
+            "Vendor details fetched successfully",
+            vendorData
+        );
+    } catch (error) {
+        console.error('Error fetching vendor details:', error);
+        return res.error(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "false",
+            "Error fetching vendor details",
             error
         );
     }

@@ -1,8 +1,12 @@
-const { Vendor, MenuItem, MenuPhoto } = require('../models');
+const { Vendor, MenuItem, MenuPhoto ,MenuSection } = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
 const fs = require('fs');
 const path = require('path');
+const sequelize = require('../config/db');
+const bcrypt = require('bcrypt'); 
+const jwt = require('jsonwebtoken'); 
+
 const multer = require('multer');
 
 const vendorController = {};
@@ -63,159 +67,207 @@ const upload = multer({
 // Add new vendor
 vendorController.addVendor = async (req, res) => {
     try {
-        // Handle file uploads
-        upload(req, res, async function(err) {
-            if (err) {
-                return res.error(
-                    HttpStatus.BAD_REQUEST,
-                    "false",
-                    err.message,
-                    []
-                );
+      upload(req, res, async function (err) {
+        if (err) {
+          return res.error(HttpStatus.BAD_REQUEST, "false", err.message, []);
+        }
+  
+        const {
+          name, phoneNumber, address, gstin, fssaiNumber,
+          accountHolderName, accountNumber, ifscCode, bankName,
+          branch, openingTime, closingTime,
+          subscriptionPrice15Days, subscriptionPriceMonthly,
+          yearsInBusiness, menuType, password
+        } = req.body;
+  
+        // Parse mealTypes safely
+        let processedMealTypes = [];
+        try {
+          processedMealTypes = JSON.parse(req.body.mealTypes);
+        } catch (e) {
+          processedMealTypes = [];
+        }
+  
+        // Parse menuSections safely
+        let parsedMenuSections = [];
+        try {
+          parsedMenuSections = JSON.parse(req.body.menuSections);
+        } catch (e) {
+          return res.error(HttpStatus.BAD_REQUEST, "false", "Invalid menuSections JSON", []);
+        }
+  
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const logoPath = req.files.logo?.[0]?.path || null;
+        const fssaiCertificatePath = req.files.fssaiCertificate?.[0]?.path || null;
+  
+        const t = await sequelize.transaction();
+  
+        try {
+          //  Create vendor
+          const vendor = await Vendor.create({
+            name, phoneNumber, address, logo: logoPath, gstin, fssaiNumber,
+            fssaiCertificate: fssaiCertificatePath, accountHolderName, accountNumber,
+            ifscCode, bankName, branch, openingTime, closingTime,
+            subscriptionPrice15Days, subscriptionPriceMonthly,
+            yearsInBusiness, menuType,
+            mealTypes: processedMealTypes,
+            password: hashedPassword
+          }, { transaction: t });
+  
+          // Save menu sections & menu items
+          for (const section of parsedMenuSections) {
+            const menuSection = await MenuSection.create({
+              vendorId: vendor.id,
+              menuType: section.menuType,
+              mealType: section.mealType,
+              sectionName: section.sectionName || 'MENU 1'
+            }, { transaction: t });
+  
+            if (section.menuItems && Array.isArray(section.menuItems)) {
+              for (const item of section.menuItems) {
+                await MenuItem.create({
+                  menuSectionId: menuSection.id,
+                  vendorId: vendor.id,
+                  dayOfWeek: item.dayOfWeek,
+                  items: item.items
+                }, { transaction: t });
+              }
             }
-            
-            const {
-                name,
-                contactNumber,
-                address,
-                gstin,
-                fssaiNumber,
-                accountHolderName,
-                accountNumber,
-                ifscCode,
-                bankName,
-                branch,
-                openingTime,
-                closingTime,
-                subscriptionPrice15Days,
-                subscriptionPriceMonthly,
-                yearsInBusiness,
-                menuItems
-            } = req.body;
-            
-            // Validate required fields
-            if (!name || !contactNumber || !address || !fssaiNumber || 
-                !accountHolderName || !accountNumber || !ifscCode || !bankName ||
-                !openingTime || !closingTime) {
-                return res.error(
-                    HttpStatus.BAD_REQUEST,
-                    "false",
-                    "Required fields are missing",
-                    []
-                );
+          }
+  
+          // Handle menu photos
+          if (req.files.menuPhotos) {
+            for (const photo of req.files.menuPhotos) {
+              await MenuPhoto.create({
+                vendorId: vendor.id,
+                photoUrl: photo.path
+              }, { transaction: t });
             }
-            
-            // Get file paths
-            const logoPath = req.files.logo ? req.files.logo[0].path : null;
-            const fssaiCertificatePath = req.files.fssaiCertificate ? req.files.fssaiCertificate[0].path : null;
-            
-            if (!fssaiCertificatePath) {
-                return res.error(
-                    HttpStatus.BAD_REQUEST,
-                    "false",
-                    "FSSAI Certificate is required",
-                    []
-                );
-            }
-            
-            // Create vendor
-            const vendor = await Vendor.create({
-                name,
-                contactNumber,
-                address,
-                logo: logoPath,
-                gstin,
-                fssaiNumber,
-                fssaiCertificate: fssaiCertificatePath,
-                accountHolderName,
-                accountNumber,
-                ifscCode,
-                bankName,
-                branch,
-                openingTime,
-                closingTime,
-                subscriptionPrice15Days,
-                subscriptionPriceMonthly,
-                yearsInBusiness
-            });
-            
-            // Add menu items if provided
-            let createdMenuItems = [];
-            if (menuItems && typeof menuItems === 'string') {
-                try {
-                    const parsedMenuItems = JSON.parse(menuItems);
-                    if (Array.isArray(parsedMenuItems) && parsedMenuItems.length > 0) {
-                        const menuItemPromises = parsedMenuItems.map(item => {
-                            return MenuItem.create({
-                                vendorId: vendor.id,
-                                name: item.name,
-                                price: item.price
-                            });
-                        });
-                        
-                        createdMenuItems = await Promise.all(menuItemPromises);
-                    }
-                } catch (error) {
-                    console.error("Error parsing menu items:", error);
-                }
-            }
-            
-            // Add menu photos if provided
-            let menuPhotos = [];
-            if (req.files.menuPhotos && req.files.menuPhotos.length > 0) {
-                const menuPhotoPromises = req.files.menuPhotos.map(photo => {
-                    return MenuPhoto.create({
-                        vendorId: vendor.id,
-                        photoUrl: photo.path
-                    });
-                });
-                
-                menuPhotos = await Promise.all(menuPhotoPromises);
-            }
-            
-            return res.success(
-                HttpStatus.CREATED,
-                "true",
-                "Vendor added successfully",
-                {
-                    vendor,
-                    menuItems: createdMenuItems,
-                    menuPhotos
-                }
-            );
-        });
-    } catch (error) {
-        console.error("Error adding vendor:", error);
-        return res.error(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "false",
-            ResponseMessages.INTERNAL_SERVER_ERROR,
-            error
-        );
-    }
-};
-
-
-
-// Get active vendors (for user panel)
-vendorController.getActiveVendors = async (req, res) => {
-    try {
-        const vendors = await Vendor.findAll({
-            where: { isActive: true },
+          }
+  
+          await t.commit();
+  
+          //  Fetch and include formatted menu in response
+          const sections = await MenuSection.findAll({
+            where: { vendorId: vendor.id },
             include: [
-                { model: MenuItem, where: { isActive: true }, required: false },
-                { model: MenuPhoto }
-            ]
+              {
+                model: MenuItem,
+                as: 'menuItems',
+                attributes: ['dayOfWeek', 'items']
+              }
+            ],
+            attributes: ['menuType', 'mealType', 'sectionName']
+          });
+  
+          const formattedMenu = sections.map(section => ({
+            menuType: section.menuType,
+            mealType: section.mealType,
+            sectionName: section.sectionName,
+            menuItems: section.menuItems.map(item => ({
+              dayOfWeek: item.dayOfWeek,
+              items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items
+            }))
+          }));
+  
+          return res.success(HttpStatus.CREATED, "true", "Vendor added successfully", {
+            ...vendor.toJSON(),
+            mealTypes: processedMealTypes,
+            menu: formattedMenu
+          });
+  
+        } catch (error) {
+          await t.rollback();
+          return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
+        }
+      });
+    } catch (error) {
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
+    }
+  };
+  
+
+
+
+
+// Vendor login method
+vendorController.login = async (req, res) => {
+    try {
+        const { phoneNumber, password } = req.body;
+        
+        // Validate input
+        if (!phoneNumber || !password) {
+            return res.error(
+                HttpStatus.BAD_REQUEST,
+                "false",
+                "Phone number and password are required",
+                []
+            );
+        }
+        
+        // Find vendor by phone number
+        const vendor = await Vendor.findOne({ 
+            where: { phoneNumber },
+            attributes: ['id', 'name', 'phoneNumber', 'password', 'isActive'] 
         });
+        
+        if (!vendor) {
+            return res.error(
+                HttpStatus.NOT_FOUND,
+                "false",
+                "Vendor not found",
+                []
+            );
+        }
+        
+        // Check if vendor is active
+        if (!vendor.isActive) {
+            return res.error(
+                HttpStatus.UNAUTHORIZED,
+                "false",
+                "Your account is inactive. Please contact admin.",
+                []
+            );
+        }
+        
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, vendor.password);
+        if (!isValidPassword) {
+            return res.error(
+                HttpStatus.UNAUTHORIZED,
+                "false",
+                "Invalid credentials",
+                []
+            );
+        }
+        
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: vendor.id,
+                contactNumber: vendor.phoneNumber,
+                role: 'vendor'
+            },
+            process.env.APP_SUPER_SECRET_KEY,
+            { expiresIn: '24h' }
+        );
+        
+        // Remove password from response
+        const vendorResponse = vendor.toJSON();
+        delete vendorResponse.password;
         
         return res.success(
             HttpStatus.OK,
             "true",
-            "Vendors fetched successfully",
-            { vendors }
+            "Login successful",
+            {
+                vendor: vendorResponse,
+                token
+            }
         );
+        
     } catch (error) {
-        console.error("Error fetching vendors:", error);
+        console.error("Vendor login error:", error);
         return res.error(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "false",
@@ -225,85 +277,64 @@ vendorController.getActiveVendors = async (req, res) => {
     }
 };
 
+//for based on the meal type ............................
 
-// Get vendors list with pagination
-vendorController.getVendorsList = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 25;
-        const offset = (page - 1) * limit;
-        
-        // Get vendors with pagination - update attributes to match your actual table columns
-        const { count, rows: vendors } = await Vendor.findAndCountAll({
-            attributes: ['id', 'name', 'contactNumber', 'createdAt', 'isActive'],
-            limit,
-            offset,
-            order: [['createdAt', 'DESC']]
-        });
-        
-        // Get order counts and payment status for each vendor
-        const vendorsWithDetails = await Promise.all(vendors.map(async (vendor) => {
-            const vendorData = vendor.toJSON();
-            
-            // Format the joined date
-            vendorData.joinedDate = new Date(vendorData.createdAt).toISOString().split('T')[0];
-            
-            // Add email field using contactNumber as a placeholder
-            vendorData.email = `vendor${vendor.id}@example.com`;  // You can replace this with actual email if available
-            
-            // Get order count for this vendor - if Order model exists
-            let orderCount = 0;
-            try {
-                if (global.models && global.models.Order) {
-                    orderCount = await global.models.Order.count({
-                        where: { vendorId: vendor.id }
-                    });
-                }
-            } catch (err) {
-                console.log('Order count error:', err.message);
-                // Continue execution even if order count fails
-            }
-            
-            // Determine payment status (mock data for now)
-            const paymentStatus = Math.random() > 0.5 ? 'Paid' : 'Unpaid';
-            
-            return {
-                ...vendorData,
-                status: vendorData.isActive ? 'Active' : 'Inactive',
-                orders: orderCount || Math.floor(Math.random() * 30) + 1, // Mock data if real count not available
-                paymentStatus
-            };
-        }));
-        
-        // Calculate pagination info
-        const totalPages = Math.ceil(count / limit);
-        const currentPage = page;
-        const showing = `${offset + 1}–${Math.min(offset + limit, count)} of ${count}`;
-        
-        return res.success(
-            HttpStatus.OK,
-            "true",
-            "Vendors list fetched successfully",
-            {
-                vendors: vendorsWithDetails,
-                pagination: {
-                    totalItems: count,
-                    totalPages,
-                    currentPage,
-                    showing,
-                    limit
-                }
-            }
-        );
-    } catch (error) {
-        console.error("Error fetching vendors list:", error);
-        return res.error(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "false",
-            "Internal server error",
-            error
-        );
+vendorController.getMenuByMealType = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { mealType } = req.query;
+
+    if (!mealType || !["lunch", "dinner", "breakfast"].includes(mealType.toLowerCase())) {
+      return res.error(400, "false", "Invalid or missing mealType", []);
     }
+
+    // Fetch menu sections of the vendor by mealType
+    const sections = await MenuSection.findAll({
+      where: {
+        vendorId,
+        mealType: mealType.charAt(0).toUpperCase() + mealType.slice(1).toLowerCase()
+      },
+      include: [
+        {
+          model: MenuItem,
+          attributes: ["dayOfWeek", "items"],
+          where: { isActive: true },
+          required: true
+        }
+      ]
+    });
+
+    // Group by day
+    const dayMap = {};
+    sections.forEach(section => {
+      section.menuItems.forEach(item => {
+        const day = item.dayOfWeek;
+        const foods = typeof item.items === "string" ? JSON.parse(item.items) : item.items;
+
+        if (!dayMap[day]) dayMap[day] = [];
+
+        dayMap[day].push(...foods);
+      });
+    });
+
+    const groupedMenu = Object.entries(dayMap).map(([day, items]) => ({
+      dayOfWeek: day,
+      items
+    }));
+
+    return res.success(200, "true", "Menu fetched successfully", {
+      vendorId,
+      mealType,
+      menu: groupedMenu
+    });
+
+  } catch (error) {
+    return res.error(500, "false", error.message, []);
+  }
 };
+
+
+
+
 
 module.exports = vendorController;

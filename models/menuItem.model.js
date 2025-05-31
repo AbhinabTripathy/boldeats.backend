@@ -1,12 +1,22 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 const Vendor = require('./vendor.model');
+const MenuPhoto = require('./menuPhoto.model');
+const MenuSection = require('./menuSection.model');
 
 const MenuItem = sequelize.define('menuItems', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true
+    },
+    menuSectionId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: MenuSection,
+            key: 'id'
+        }
     },
     vendorId: {
         type: DataTypes.INTEGER,
@@ -16,13 +26,14 @@ const MenuItem = sequelize.define('menuItems', {
             key: 'id'
         }
     },
-    name: {
-        type: DataTypes.STRING,
+    dayOfWeek: {
+        type: DataTypes.ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
         allowNull: false
     },
-    price: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false
+    items: {
+        type: DataTypes.JSON,
+        allowNull: false,
+        defaultValue: []
     },
     isActive: {
         type: DataTypes.BOOLEAN,
@@ -32,8 +43,15 @@ const MenuItem = sequelize.define('menuItems', {
     timestamps: true
 });
 
-// Define relationship
+// Define relationships
 Vendor.hasMany(MenuItem, { foreignKey: 'vendorId' });
 MenuItem.belongsTo(Vendor, { foreignKey: 'vendorId' });
+
+MenuSection.hasMany(MenuItem, { foreignKey: 'menuSectionId' });
+MenuItem.belongsTo(MenuSection, { foreignKey: 'menuSectionId' });
+
+// Add the association with MenuPhoto
+MenuItem.hasMany(MenuPhoto, { foreignKey: 'menuItemId' });
+MenuPhoto.belongsTo(MenuItem, { foreignKey: 'menuItemId' });
 
 module.exports = MenuItem;

@@ -16,6 +16,10 @@ const MenuPhoto = sequelize.define('menuPhotos', {
             key: 'id'
         }
     },
+    menuItemId: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
     photoUrl: {
         type: DataTypes.STRING,
         allowNull: false
@@ -24,7 +28,7 @@ const MenuPhoto = sequelize.define('menuPhotos', {
     timestamps: true
 });
 
-// Define relationship
+// Define relationships
 Vendor.hasMany(MenuPhoto, { foreignKey: 'vendorId' });
 MenuPhoto.belongsTo(Vendor, { foreignKey: 'vendorId' });
 

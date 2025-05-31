@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
+
 const Vendor = sequelize.define('vendors', {
     id: {
         type: DataTypes.INTEGER,
@@ -11,7 +12,7 @@ const Vendor = sequelize.define('vendors', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    contactNumber: {
+    phoneNumber: {
         type: DataTypes.STRING,
         allowNull: false
     },
@@ -82,7 +83,20 @@ const Vendor = sequelize.define('vendors', {
     isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
-    }
+    },
+    menuType: {
+        type: DataTypes.ENUM('Veg', 'Non-Veg', 'Both'),
+        allowNull: true
+    },
+    mealTypes: {
+        type: DataTypes.JSON, 
+        allowNull: true,
+        defaultValue: []
+    },
+    password: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
 }, {
     timestamps: true
 });
