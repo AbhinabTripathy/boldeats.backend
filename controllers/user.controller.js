@@ -5,7 +5,7 @@ const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
-const { User, Vendor, MenuItem, MenuPhoto } = require('../models');
+const { User, Vendor,Payment, MenuItem, MenuPhoto } = require('../models');
 
 const userController = {};
 
@@ -382,5 +382,46 @@ userController.getVendorDetails = async (req, res) => {
         );
     }
 };
+
+// Get active subscription of the logged-in user
+userController.getUserSubscription = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const payment = await Payment.findOne({
+            where: {
+                userId,
+                status: 'Completed'
+            },
+            order: [['createdAt', 'DESC']],
+            include: [
+                {
+                    model: Vendor,
+                    attributes: [
+                        'id', 'name', 'logo', 'phoneNumber', 'address',
+                        'fssaiNumber', 'yearsInBusiness', 'openingTime',
+                        'closingTime', 'menuType', 'rating',
+                        'subscriptionPrice15Days', 'subscriptionPriceMonthly',
+                        'mealTypes'
+                    ]
+                }
+            ]
+        });
+
+        if (!payment) {
+            return res.success(200, true, 'No subscription found', null);
+        }
+
+        return res.success(200, true, 'Subscription fetched successfully', {
+            planAmount: payment.amount,
+            method: payment.method,
+            vendor: payment.vendor
+        });
+    } catch (error) {
+        console.error('Subscription fetch error:', error);
+        return res.error(500, false, 'Failed to fetch subscription', error);
+    }
+};
+
 
 module.exports = userController;

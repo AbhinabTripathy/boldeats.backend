@@ -11,9 +11,6 @@ const cartRoutes = require('./routes/cart.routes');
 const addressRoutes = require('./routes/address.routes');
 const paymentRoutes = require('./routes/payment.routes');
 
-
-
-
 const seedAdmin = require('./seeders/adminSeeder');
 const path = require('path');
 const cors = require('cors');
@@ -25,7 +22,7 @@ const baseUrl = process.env.BASE_URL;
 // CORS configuration similar to your previous project
 app.use(cors({
   origin: '*', // Allow all origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS','PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));

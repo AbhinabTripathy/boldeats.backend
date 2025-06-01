@@ -7,6 +7,8 @@ const Payment = require('./payment.model');
 const MenuSection = require('./menuSection.model');
 const Cart = require('./cart.model');
 const Wallet = require('./wallet.model');
+const Subscription = require('./subscription.model');
+
 
 // Export all models
 module.exports = {
@@ -18,5 +20,6 @@ module.exports = {
   Payment,
   MenuSection,
   Cart,
-  Wallet
+  Wallet,
+  Subscription
 };
