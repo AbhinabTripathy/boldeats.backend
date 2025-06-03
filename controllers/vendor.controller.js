@@ -337,4 +337,40 @@ vendorController.getMenuByMealType = async (req, res) => {
 
 
 
+// List all active vendors
+vendorController.listVendors = async (req, res) => {
+    try {
+        const vendors = await Vendor.findAll({
+            where: { isActive: true },
+            attributes: [
+                'id', 
+                'name', 
+                'phoneNumber', 
+                'address', 
+                'logo',
+                'openingTime',
+                'closingTime',
+                'subscriptionPrice15Days',
+                'subscriptionPriceMonthly',
+                'menuType',
+                'mealTypes'
+            ]
+        });
+
+        return res.success(
+            HttpStatus.OK,
+            true,
+            "Vendors fetched successfully",
+            vendors
+        );
+    } catch (error) {
+        return res.error(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            false,
+            error.message,
+            []
+        );
+    }
+};
+
 module.exports = vendorController;

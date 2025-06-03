@@ -216,4 +216,29 @@ adminController.getPastSubscribers = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
+// Admin approves the subscription
+adminController.approveSubscription = async (req, res) => {
+    try {
+      const { subscriptionId } = req.params;
+  
+      const subscription = await Subscription.findByPk(subscriptionId);
+  
+      if (!subscription) {
+        return res.error(HttpStatus.NOT_FOUND, false, 'Subscription not found', []);
+      }
+  
+      if (subscription.isAdminApproved) {
+        return res.error(HttpStatus.BAD_REQUEST, false, 'Subscription already approved', []);
+      }
+  
+      subscription.isAdminApproved = true;
+      await subscription.save();
+  
+      return res.success(HttpStatus.OK, true, 'Subscription approved successfully', subscription);
+    } catch (error) {
+      console.error('Error approving subscription:', error);
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+  };
 module.exports = adminController;

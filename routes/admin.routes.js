@@ -18,5 +18,6 @@ router.patch('/payments/:paymentId/approve', authMiddleware.checkAuth, authMiddl
 router.get('/users/active', auth.checkAuth, auth.isAdmin, adminController.getActiveUsers);
 router.get('/users/inactive', auth.checkAuth, auth.isAdmin, adminController.getInactiveUsers);
 router.get('/users/past-subscribers', auth.checkAuth, auth.isAdmin, adminController.getPastSubscribers);
-
+router.patch('/subscriptions/:subscriptionId/approve', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.approveSubscription);
+  
 module.exports = router;

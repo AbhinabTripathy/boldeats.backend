@@ -8,6 +8,7 @@ const MenuSection = require('./menuSection.model');
 const Cart = require('./cart.model');
 const Wallet = require('./wallet.model');
 const Subscription = require('./subscription.model');
+const DailyOrder = require('./dailyOrder.model');
 
 
 // Export all models
@@ -21,5 +22,6 @@ module.exports = {
   MenuSection,
   Cart,
   Wallet,
-  Subscription
+  Subscription,
+  DailyOrder  
 };

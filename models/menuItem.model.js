@@ -44,8 +44,8 @@ const MenuItem = sequelize.define('menuItems', {
 });
 
 // Define relationships
-Vendor.hasMany(MenuItem, { foreignKey: 'vendorId' });
-MenuItem.belongsTo(Vendor, { foreignKey: 'vendorId' });
+Vendor.hasMany(MenuItem, { foreignKey: 'vendorId', as: 'menuItems' });
+MenuItem.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'vendor' });
 
 MenuSection.hasMany(MenuItem, { foreignKey: 'menuSectionId' });
 MenuItem.belongsTo(MenuSection, { foreignKey: 'menuSectionId' });

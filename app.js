@@ -10,6 +10,8 @@ const vendorRoutes = require('./routes/vendor.routes');
 const cartRoutes = require('./routes/cart.routes');
 const addressRoutes = require('./routes/address.routes');
 const paymentRoutes = require('./routes/payment.routes');
+const dailyOrderRoutes = require('./routes/dailyOrder.routes');
+const { scheduleDailyOrders } = require('./schedulers/orderScheduler');
 
 const seedAdmin = require('./seeders/adminSeeder');
 const path = require('path');
@@ -26,7 +28,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-
+ 
 // Increase JSON and URL-encoded payload limits
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -42,6 +44,9 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/payment', paymentRoutes);
+
+// Add new routes
+app.use('/api/daily-orders', dailyOrderRoutes);
 
 // Error handling middlewares
 app.use(handleNotFound);
@@ -59,7 +64,7 @@ async function startServer() {
             await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
             
             // Change alter to false to prevent automatic schema changes
-            await sequelize.sync({ force: false, alter: false });
+            await sequelize.sync({ force: false, alter: true });
             console.log('Database tables synced successfully.');
             
             // Re-enable foreign key checks
@@ -79,6 +84,11 @@ async function startServer() {
         }
 
         // start server
+        // Initialize the daily order scheduler
+        scheduleDailyOrders();
+        console.log('Daily order scheduler initialized');
+
+        // Start server
         app.listen(port, () => {
             console.log(`Server running at : ${baseUrl}`);
         });

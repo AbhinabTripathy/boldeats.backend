@@ -61,82 +61,68 @@ exports.uploadReceipt = async (req, res) => {
 // Admin approves payment
 exports.approvePayment = async (req, res) => {
     const { paymentId } = req.params;
-    const { status } = req.body;
-
-    // Only allow specific statuses
-    if (!['Completed', 'Pending', 'Rejected'].includes(status)) {
-        return res.error(HttpStatus.BAD_REQUEST, false, 'Invalid status provided', []);
-    }
-
     const normalizedPaymentId = paymentId.toUpperCase();
 
     const payment = await Payment.findOne({
-        where: { paymentId: normalizedPaymentId }
+        where: {
+            paymentId: normalizedPaymentId,
+            status: 'Pending'
+        }
     });
 
     if (!payment) {
-        return res.error(HttpStatus.NOT_FOUND, false, 'Payment not found', []);
+        return res.error(HttpStatus.NOT_FOUND, false, 'Invalid payment or already processed', []);
     }
 
-    // If already processed, avoid re-processing
-    if (payment.status === 'Completed' || payment.status === 'Rejected') {
-        return res.error(HttpStatus.BAD_REQUEST, false, 'Payment already processed', []);
-    }
-
-    // Start transaction
     const t = await sequelize.transaction();
+
     try {
-        payment.status = status;
+        // 1. Mark payment as completed
+        payment.status = 'Completed';
         await payment.save({ transaction: t });
 
-        // Only process wallet/subscription if marked as Completed
-        if (status === 'Completed') {
-            // Update wallet
-            let wallet = await Wallet.findOne({ where: { userId: payment.userId } });
-            if (!wallet) {
-                wallet = await Wallet.create({ userId: payment.userId, amount: payment.amount }, { transaction: t });
-            } else {
-                wallet.amount += payment.amount;
-                await wallet.save({ transaction: t });
-            }
-
-            // Fetch Cart to get plan details
-            const cartItem = await Cart.findOne({
-                where: { userId: payment.userId, vendorId: payment.vendorId },
-                order: [['createdAt', 'DESC']]
-            });
-
-            if (!cartItem) {
-                await t.rollback();
-                return res.error(HttpStatus.BAD_REQUEST, false, 'Cart data not found for subscription', []);
-            }
-
-            // Calculate endDate based on planType
-            const durationDays = cartItem.planType === '15days' ? 15 : 30;
-            const startDate = new Date();
-            const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + durationDays);
-
-            // Create Subscription
-            await Subscription.create({
-                userId: payment.userId,
-                vendorId: payment.vendorId,
-                menuType: 'Veg', // Optional: Fetch from vendor if needed
-                mealTypes: [],   // Optional: can be set from cart if stored
-                startDate,
-                endDate,
-                amount: payment.amount,
-                paymentId: payment.paymentId
-            }, { transaction: t });
+        // 2. Update/Add wallet
+        let wallet = await Wallet.findOne({ where: { userId: payment.userId } });
+        if (!wallet) {
+            wallet = await Wallet.create({ userId: payment.userId, amount: payment.amount }, { transaction: t });
+        } else {
+            wallet.amount += payment.amount;
+            await wallet.save({ transaction: t });
         }
 
+        // 3. Fetch last cart item to create subscription
+        const cartItems = await Cart.findAll({ where: { userId: payment.userId } });
+        if (!cartItems || cartItems.length === 0) {
+            await t.rollback();
+            return res.error(HttpStatus.BAD_REQUEST, false, 'Cart is empty. Cannot create subscription.', []);
+        }
+
+        const latestCart = cartItems[cartItems.length - 1];
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + (latestCart.planType === '15days' ? 15 : 30));
+
+        await Subscription.create({
+            userId: payment.userId,
+            vendorId: latestCart.vendorId,
+            menuType: latestCart.menuType,
+            mealTypes: latestCart.mealTypes,
+            startDate,
+            endDate,
+            amount: latestCart.totalPrice,
+            paymentId: payment.paymentId,
+            status: 'Active'
+        }, { transaction: t });
+
         await t.commit();
-        return res.success(HttpStatus.OK, true, 'Payment status updated successfully', payment);
+        return res.success(HttpStatus.OK, true, 'Payment approved and subscription created successfully', []);
     } catch (error) {
         await t.rollback();
+        console.error("approvePayment error:", error);
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
 
 
 

@@ -52,4 +52,39 @@ cartController.addToCart = async (req, res) => {
   }
 };
 
+// Get Cart
+cartController.getCart = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const cartItems = await Cart.findAll({ where: { userId } });
+    return res.success(HttpStatus.OK, true, 'Cart fetched successfully', cartItems);
+  } catch (error) {
+    return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+  }
+};
+
+// Remove from Cart
+cartController.removeFromCart = async (req, res) => {
+  try {
+    const cartItemId = req.params.cartItemId;  
+    const userId = req.user.id;
+
+    const item = await Cart.findOne({ where: { id: cartItemId, userId } });
+
+    if (!item) {
+      return res.error(HttpStatus.NOT_FOUND, false, 'Cart item not found', []);
+    }
+
+    await item.destroy();
+    return res.success(HttpStatus.OK, true, 'Item removed from cart', []);
+  } catch (error) {
+    return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+  }
+};
+
+
+
+
+
+
 module.exports = cartController;

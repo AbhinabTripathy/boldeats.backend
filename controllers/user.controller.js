@@ -299,7 +299,11 @@ userController.getAllVendors = async (req, res) => {
         const vendors = await Vendor.findAll({
             include: [{
                 model: MenuItem,
-                include: [MenuPhoto]
+                as: 'menuItems',  
+                include: [{
+                    model: MenuPhoto,
+                    as: 'menuPhotos' 
+                }]
             }],
             attributes: [
                 'id', 'name', 'logo', 'phoneNumber', 'address',
@@ -307,7 +311,8 @@ userController.getAllVendors = async (req, res) => {
                 'closingTime', 'menuType', 'rating',
                 'subscriptionPrice15Days', 'subscriptionPriceMonthly',
                 'mealTypes'
-            ]
+            ],
+            where: { isActive: true }  // Only get active vendors
         });
 
         return res.success(
@@ -336,6 +341,7 @@ userController.getVendorDetails = async (req, res) => {
             where: { id },
             include: [{
                 model: MenuItem,
+                as:'menuItems',
                 include: [MenuPhoto]
             }],
             attributes: [

@@ -7,6 +7,7 @@ const authMiddleware = require('../middlewares/auth.middleware');
 router.post('/addVendor',vendorController.addVendor);
 router.post('/login', vendorController.login);
 router.get('/:vendorId/menu', vendorController.getMenuByMealType);
+router.get('/list', vendorController.listVendors);
 
 
 

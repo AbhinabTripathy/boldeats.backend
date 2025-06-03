@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { User, Vendor } = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages=require('../enums/responseMessages.enum');
 
@@ -16,19 +16,26 @@ authMiddleware.checkAuth = async (req, res, next) => {
         
         try {
             const decoded = jwt.verify(token, process.env.APP_SUPER_SECRET_KEY);
-            console.log("Decoded token:", decoded); // Log the decoded token
-            const user = await User.findByPk(decoded.id);
+            console.log("Decoded token:", decoded);
+
+            let user;
+            if (decoded.role === 'vendor') {
+                user = await Vendor.findByPk(decoded.id);
+            } else {
+                user = await User.findByPk(decoded.id);
+            }
             
             if (!user) {
                 return res.error(HttpStatus.UNAUTHORIZED, false, "User not found");
             }
+
             console.log("User found:", {
                 id: user.id,
-                email: user.email,
-                role: user.role
-            }); // Log the user details
+                role: decoded.role
+            });
 
             req.user = user;
+            req.user.role = decoded.role; // Ensure role is available
             next();
         } catch (error) {
             console.error("Token verification error:", error);
