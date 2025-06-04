@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
+const { Op } = require('sequelize');
 
 const adminController = {};
 
@@ -115,32 +116,35 @@ adminController.getDashboard = async (req, res) => {
   };
   
 //get active users......................
-  adminController.getActiveUsers = async (req, res) => {
+adminController.getActiveUsers = async (req, res) => {
     try {
-        const subscriptions = await Subscription.findAll({
-            include: [
-    { model: User, as: 'user', attributes: ['id', 'name', 'email', 'phone_number'] },
-    { model: Vendor, as: 'vendor', attributes: ['id', 'name'] }
-]
-
-        });
-
-        const formatted = subscriptions.map(sub => ({
-            userId: `USER${String(sub.userId).padStart(3, '0')}`,
-            name: sub.user.name,
-            vendorId: `VEND${String(sub.vendorId).padStart(3, '0')}`,
-            subscriptionType: sub.endDate ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days` : 'N/A',
-            startDate: sub.startDate.toISOString().split('T')[0],
-            pendingBalance: `₹${sub.amount}`,
-            countdown: 0
-        }));
-
-        return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formatted);
+      const subscriptions = await Subscription.findAll({
+        include: [
+          { model: User, as: 'Subscriber', attributes: ['id', 'name', 'email', 'phone_number'] },
+          { model: Vendor, as: 'VendorSubscription', attributes: ['id', 'name'] }
+        ]
+      });
+  
+      const formatted = subscriptions.map(sub => ({
+        userId: `USER${String(sub.userId).padStart(3, '0')}`,
+        name: sub.Subscriber ? sub.Subscriber.name : 'N/A',
+        vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
+        subscriptionType: sub.endDate && sub.startDate
+          ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days`
+          : 'N/A',
+        startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+        pendingBalance: `₹${sub.amount}`,
+        countdown: 0
+      }));
+  
+      return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formatted);
     } catch (error) {
-        console.error('Active users error:', error);
-        return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+      console.error('Active users error:', error);
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
-};
+  };
+  
+  
 
 
 //get in active users................
@@ -180,22 +184,22 @@ adminController.getInactiveUsers = async (req, res) => {
 adminController.getPastSubscribers = async (req, res) => {
     try {
         const currentDate = new Date();
-        
+
         const pastSubscriptions = await Subscription.findAll({
             where: {
                 endDate: {
-                    [require('sequelize').Op.lt]: currentDate
+                    [Op.lt]: currentDate
                 }
             },
             include: [
                 { 
                     model: User,
-                    as: 'user',
+                    as: 'Subscriber',       // Use 'Subscriber' alias here
                     attributes: ['id', 'name']
                 },
                 { 
                     model: Vendor,
-                    as: 'vendor',
+                    as: 'VendorSubscription',  // Use 'VendorSubscription' alias here
                     attributes: ['id', 'name']
                 }
             ],
@@ -204,10 +208,10 @@ adminController.getPastSubscribers = async (req, res) => {
 
         const formatted = pastSubscriptions.map(sub => ({
             userId: `USER${String(sub.userId).padStart(3, '0')}`,
-            name: sub.user.name,
-            vendorId: `VEND${String(sub.vendorId).padStart(3, '0')}`,
-            startDate: sub.startDate.toISOString().split('T')[0],
-            endDate: sub.endDate.toISOString().split('T')[0]
+            name: sub.Subscriber ? sub.Subscriber.name : 'N/A',
+            vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
+            startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+            endDate: sub.endDate ? new Date(sub.endDate).toISOString().split('T')[0] : 'N/A'
         }));
 
         return res.success(HttpStatus.OK, true, 'Past subscribers fetched successfully', formatted);

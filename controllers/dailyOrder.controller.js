@@ -1,13 +1,15 @@
 const { DailyOrder, Subscription, User, Wallet } = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const sequelize = require('../config/db');
+const { Op } = require('sequelize');
+
 
 const dailyOrderController = {};
 
-// Get today's orders for vendor
+//get daily orders for a vendor
 dailyOrderController.getVendorDailyOrders = async (req, res) => {
     try {
-        const vendorId = req.user.id; // Changed from req.vendor.id to req.user.id
+        const vendorId = req.user.id;
         const today = new Date().toISOString().split('T')[0];
 
         const orders = await DailyOrder.findAll({
@@ -17,8 +19,10 @@ dailyOrderController.getVendorDailyOrders = async (req, res) => {
             },
             include: [{
                 model: Subscription,
+                as: 'Subscription',  // use the alias
                 include: [{
                     model: User,
+                    as: 'User',         // use the alias from Subscription model
                     attributes: ['name', 'phone_number']
                 }]
             }]
@@ -30,13 +34,14 @@ dailyOrderController.getVendorDailyOrders = async (req, res) => {
     }
 };
 
+
 // Accept or reject daily order
 dailyOrderController.updateOrderStatus = async (req, res) => {
     const t = await sequelize.transaction();
     try {
         const { orderId } = req.params;
         const { status, reason } = req.body;
-        const vendorId = req.user.id; // Changed from req.vendor.id to req.user.id
+        const vendorId = req.user.id; 
 
         if (!['Accepted', 'Rejected', 'Skipped'].includes(status)) {
             return res.error(HttpStatus.BAD_REQUEST, false, 'Invalid status', []);
@@ -46,7 +51,11 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
             where: { id: orderId, vendorId },
             include: [{
                 model: Subscription,
-                include: [{ model: User }]
+                as: 'Subscription',  
+                include: [{
+                    model: User,
+                    as: 'User'        
+                }]
             }]
         });
 

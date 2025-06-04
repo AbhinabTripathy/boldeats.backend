@@ -4,12 +4,12 @@ const vendorController = require('../controllers/vendor.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 // Vendor authentication routes
-router.post('/addVendor',vendorController.addVendor);
+router.post('/addVendor', vendorController.addVendor);
 router.post('/login', vendorController.login);
 router.get('/:vendorId/menu', vendorController.getMenuByMealType);
 router.get('/list', vendorController.listVendors);
-
-
-
+router.put('/:id', vendorController.updateVendor);
+router.put('/toggle-status/:id', vendorController.toggleVendorStatus);
+router.delete('/delete/:id',authMiddleware.checkAuth,authMiddleware.isAdmin,vendorController.deleteVendor);
 
 module.exports = router;

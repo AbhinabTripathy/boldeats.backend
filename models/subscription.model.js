@@ -1,6 +1,7 @@
-// Updated subscription.model.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
+const User = require('./user.model');
+const Vendor = require('./vendor.model');
 
 const Subscription = sequelize.define('subscriptions', {
   id: {
@@ -45,5 +46,9 @@ const Subscription = sequelize.define('subscriptions', {
 }, {
   timestamps: true
 });
+
+// // Define associations
+// Subscription.belongsTo(User, { foreignKey: 'userId', as: 'User' });
+// Subscription.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'Vendor' });
 
 module.exports = Subscription;

@@ -39,7 +39,7 @@ const DailyOrder = sequelize.define('daily_orders', {
     }
 });
 
-DailyOrder.belongsTo(Subscription);
-DailyOrder.belongsTo(Vendor);
+DailyOrder.belongsTo(Subscription, { foreignKey: 'subscriptionId', as: 'Subscription' });
+DailyOrder.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'Vendor' });
 
 module.exports = DailyOrder;

@@ -4,6 +4,8 @@ const adminController = require('../controllers/admin.controller');
 const paymentController = require('../controllers/payment.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const auth = require('../middlewares/auth.middleware');
+const dailyOrderController = require('../controllers/dailyOrder.controller');
+
 
 
 // Admin authentication routes
@@ -19,5 +21,21 @@ router.get('/users/active', auth.checkAuth, auth.isAdmin, adminController.getAct
 router.get('/users/inactive', auth.checkAuth, auth.isAdmin, adminController.getInactiveUsers);
 router.get('/users/past-subscribers', auth.checkAuth, auth.isAdmin, adminController.getPastSubscribers);
 router.patch('/subscriptions/:subscriptionId/approve', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.approveSubscription);
+
+
+router.post(
+  '/generate-daily-orders',
+  authMiddleware.checkAuth,
+  authMiddleware.isAdmin,
+  async (req, res) => {
+    try {
+      await dailyOrderController.createDailyOrders();
+      res.status(200).json({ success: true, message: 'Daily orders generated manually' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Error generating daily orders', error: error.message });
+    }
+  }
+);
+
   
 module.exports = router;

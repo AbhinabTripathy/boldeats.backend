@@ -10,8 +10,15 @@ const Wallet = require('./wallet.model');
 const Subscription = require('./subscription.model');
 const DailyOrder = require('./dailyOrder.model');
 
+// Define associations
+Subscription.belongsTo(User, { foreignKey: 'userId', as: 'Subscriber' });
+Subscription.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'VendorSubscription' });
 
-// Export all models
+Subscription.hasMany(DailyOrder, { foreignKey: 'subscriptionId', as: 'dailyOrders' });
+
+DailyOrder.belongsTo(Subscription, { foreignKey: 'subscriptionId', as: 'DailyOrderSubscription' });
+DailyOrder.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'VendorOrder' });
+
 module.exports = {
   User,
   Vendor,
