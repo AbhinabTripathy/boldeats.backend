@@ -1,4 +1,4 @@
-const { Vendor, MenuItem, MenuPhoto ,MenuSection } = require('../models');
+const { Vendor, MenuItem, MenuPhoto ,MenuSection ,DailyOrder,Subscription,User ,Payment} = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
 const fs = require('fs');
@@ -6,6 +6,7 @@ const path = require('path');
 const sequelize = require('../config/db');
 const bcrypt = require('bcrypt'); 
 const jwt = require('jsonwebtoken'); 
+const { Op } = require('sequelize');
 
 const multer = require('multer');
 
@@ -549,5 +550,131 @@ vendorController.deleteVendor = async (req, res, next) => {
   }
 };
 
+vendorController.getVendorDashboard = async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+  
+      // Check if vendor exists
+      const vendor = await Vendor.findByPk(vendorId);
+      if (!vendor) {
+        return res.error(HttpStatus.NOT_FOUND, "false", "Vendor not found", []);
+      }
+  
+      // Total Orders
+      const totalOrders = await DailyOrder.count({
+        where: { vendorId }
+      });
+  
+      // Total Revenue (only Completed payments)
+      const totalRevenueData = await Payment.findAll({
+        where: {
+          vendorId,
+          status: 'Completed'
+        },
+        attributes: [[sequelize.fn('SUM', sequelize.col('amount')), 'totalRevenue']],
+        raw: true
+      });
+      const totalRevenue = totalRevenueData[0].totalRevenue || 0;
+  
+      // Total Users (unique users with active subscriptions for this vendor)
+      const totalUsers = await Subscription.count({
+        where: {
+          vendorId,
+          status: 'Active',
+          isAdminApproved: true
+        },
+        distinct: true,
+        col: 'userId'
+      });
+  
+      return res.success(HttpStatus.OK, true, "Dashboard stats fetched successfully", {
+        totalOrders,
+        totalRevenue,
+        totalUsers
+      });
+  
+    } catch (error) {
+      console.error(error);
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+  };
+  
 
+  vendorController.getActiveUsersByVendor = async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+  
+      const subscriptions = await Subscription.findAll({
+        where: {
+          vendorId,
+          status: 'Active',
+          isAdminApproved: true
+        },
+        include: [
+          { model: User, as: 'Subscriber', attributes: ['id', 'name', 'email', 'phone_number'] },
+          { model: Vendor, as: 'VendorSubscription', attributes: ['id', 'name'] }
+        ]
+      });
+  
+      const formatted = subscriptions.map(sub => ({
+        userId: `USER${String(sub.userId).padStart(3, '0')}`,
+        name: sub.Subscriber?.name || 'N/A',
+        vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
+        subscriptionType: sub.endDate && sub.startDate
+          ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days`
+          : 'N/A',
+        startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+        pendingBalance: `₹${parseFloat(sub.amount).toFixed(2)}`,
+        countdown: 0
+      }));
+  
+      return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formatted);
+    } catch (error) {
+      console.error('Active users by vendor error:', error);
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+  };
+  
+
+  vendorController.getPastSubscribers = async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const currentDate = new Date();
+  
+      const pastSubscriptions = await Subscription.findAll({
+        where: {
+          vendorId,
+          endDate: { [Op.lt]: currentDate }
+        },
+        include: [
+          {
+            model: User,
+            as: 'Subscriber',
+            attributes: ['id', 'name']
+          }
+        ],
+        order: [['endDate', 'DESC']]
+      });
+  
+      const formatted = pastSubscriptions.map(sub => ({
+        userId: `USER${String(sub.userId).padStart(3, '0')}`,
+        name: sub.Subscriber?.name || 'N/A',
+        subscriptionType:
+          sub.endDate && sub.startDate
+            ? Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24)) >= 30
+              ? 'Quarterly'
+              : 'Monthly'
+            : 'N/A',
+        startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+        endDate: sub.endDate ? new Date(sub.endDate).toISOString().split('T')[0] : 'N/A',
+        totalAmount: `₹${parseFloat(sub.amount).toFixed(2)}`
+      }));
+  
+      return res.success(HttpStatus.OK, true, 'Past subscribers fetched successfully', formatted);
+    } catch (error) {
+      console.error('Vendor past subscribers error:', error);
+      return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+  };
+  
 module.exports = vendorController;

@@ -19,10 +19,10 @@ dailyOrderController.getVendorDailyOrders = async (req, res) => {
             },
             include: [{
                 model: Subscription,
-                as: 'Subscription',  // use the alias
+                as: 'DailyOrderSubscription',
                 include: [{
                     model: User,
-                    as: 'User',         // use the alias from Subscription model
+                    as: 'Subscriber',
                     attributes: ['name', 'phone_number']
                 }]
             }]
@@ -41,7 +41,7 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.params;
         const { status, reason } = req.body;
-        const vendorId = req.user.id; 
+        const vendorId = req.user.id;
 
         if (!['Accepted', 'Rejected', 'Skipped'].includes(status)) {
             return res.error(HttpStatus.BAD_REQUEST, false, 'Invalid status', []);
@@ -51,10 +51,10 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
             where: { id: orderId, vendorId },
             include: [{
                 model: Subscription,
-                as: 'Subscription',  
+                as: 'DailyOrderSubscription',
                 include: [{
                     model: User,
-                    as: 'User'        
+                    as: 'Subscriber'
                 }]
             }]
         });
@@ -65,9 +65,9 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
 
         // Calculate daily amount
         const totalDays = Math.ceil(
-            (new Date(order.Subscription.endDate) - new Date(order.Subscription.startDate)) / (1000 * 60 * 60 * 24)
+            (new Date(order.DailyOrderSubscription.endDate) - new Date(order.DailyOrderSubscription.startDate)) / (1000 * 60 * 60 * 24)
         );
-        const dailyAmount = order.Subscription.amount / totalDays;
+        const dailyAmount = order.DailyOrderSubscription.amount / totalDays;
 
         // Update order status
         order.status = status;
@@ -77,7 +77,7 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
         // If order is rejected or skipped, refund the daily amount to user's wallet
         if (status === 'Rejected' || status === 'Skipped') {
             const wallet = await Wallet.findOne({
-                where: { userId: order.Subscription.User.id },
+                where: { userId: order.DailyOrderSubscription.Subscriber.id },
                 transaction: t
             });
 
@@ -94,6 +94,7 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
 
 // Scheduled task to create daily orders
 dailyOrderController.createDailyOrders = async () => {

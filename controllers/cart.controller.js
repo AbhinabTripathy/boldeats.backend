@@ -6,7 +6,7 @@ const cartController = {};
 cartController.addToCart = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { vendorId, planType, quantity } = req.body;
+    const { vendorId, planType, quantity, menuType, mealTypes } = req.body;
 
     if (!vendorId || !planType || !quantity) {
       return res.error(HttpStatus.BAD_REQUEST, false, 'All fields are required', []);
@@ -41,6 +41,8 @@ cartController.addToCart = async (req, res) => {
       userId,
       vendorId,
       planType,
+      menuType: menuType || 'both', // Default to 'both' if not provided
+      mealTypes: mealTypes || JSON.stringify(['Breakfast', 'Lunch', 'Dinner']), // Default value if not provided
       quantity,
       pricePerUnit,
       totalPrice

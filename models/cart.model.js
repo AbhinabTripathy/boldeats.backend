@@ -29,6 +29,14 @@ const Cart = sequelize.define('carts', {
     type: DataTypes.ENUM('15days', '30days'),
     allowNull: false
   },
+  menuType: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  mealTypes: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
   quantity: {
     type: DataTypes.INTEGER,
     allowNull: false
