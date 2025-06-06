@@ -1,4 +1,4 @@
-const { User, Vendor, Cart, Payment,Subscription } = require('../models');
+const { User, Vendor, Cart, Payment,Subscription,Address } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const HttpStatus = require('../enums/httpStatusCode.enum');
@@ -148,34 +148,54 @@ adminController.getActiveUsers = async (req, res) => {
 
 
 //get in active users................
-
-adminController.getInactiveUsers = async (req, res) => {
+adminController.getUsers = async (req, res) => {
     try {
+        // Get all users with customer role
+        const allUsers = await User.findAll({
+            where: {
+                role: 'customer'
+            },
+            attributes: ['id', 'name', 'email', 'phone_number', 'createdAt']
+        });
+
+        // Get users who have subscriptions (made orders)
         const subscribedUserIds = await Subscription.findAll({ attributes: ['userId'] });
         const subscribedIds = subscribedUserIds.map(sub => sub.userId);
 
-      const inactiveUsers = await User.findAll({
-    where: {
-        id: {
-            [require('sequelize').Op.notIn]: subscribedIds
-        },
-        role: 'customer'
-    },
-    attributes: ['id', 'name', 'email', 'phone_number', 'createdAt']
-});
+        // Get addresses for users who have made orders
+        const addresses = await Address.findAll({
+            where: {
+                userId: {
+                    [Op.in]: subscribedIds
+                },
+                isDefault: true
+            }
+        });
 
+        // Create a map of userId to address
+        const addressMap = {};
+        addresses.forEach(address => {
+            addressMap[address.userId] = `${address.addressLine1}, ${address.city}, ${address.state} - ${address.pincode}`;
+        });
 
-        const formatted = inactiveUsers.map(user => ({
-            userId: `USER${String(user.id).padStart(3, '0')}`,
-            name: user.name,
-            phoneNumber: user.phone_number,
-            email: user.email,
-            joinDate: new Date(user.createdAt).toLocaleDateString('en-GB')
-        }));
+        const formatted = allUsers.map(user => {
+            // Check if user has made an order (has subscription)
+            const hasOrder = subscribedIds.includes(user.id);
+            
+            return {
+                userId: `USER${String(user.id).padStart(3, '0')}`,
+                name: user.name,
+                phoneNumber: user.phone_number,
+                // Include address only if user has made an order
+                address: hasOrder ? (addressMap[user.id] || 'No default address') : '',
+                email: user.email,
+                joinDate: new Date(user.createdAt).toLocaleDateString('en-GB')
+            };
+        });
 
-        return res.success(HttpStatus.OK, true, 'Inactive users fetched successfully', formatted);
+        return res.success(HttpStatus.OK, true, 'All users fetched successfully', formatted);
     } catch (error) {
-        console.error('Inactive users error:', error);
+        console.error('Users fetch error:', error);
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
