@@ -19,6 +19,9 @@ Subscription.hasMany(DailyOrder, { foreignKey: 'subscriptionId', as: 'dailyOrder
 DailyOrder.belongsTo(Subscription, { foreignKey: 'subscriptionId', as: 'DailyOrderSubscription' });
 DailyOrder.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'VendorOrder' });
 
+User.hasMany(Address, { foreignKey: 'userId', as: 'Addresses' });
+Address.belongsTo(User, { foreignKey: 'userId', as: 'User' });
+
 module.exports = {
   User,
   Vendor,

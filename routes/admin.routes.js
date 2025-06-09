@@ -21,6 +21,7 @@ router.get('/users/active', auth.checkAuth, auth.isAdmin, adminController.getAct
 router.get('/users', auth.checkAuth, auth.isAdmin, adminController.getUsers);
 router.get('/users/past-subscribers', auth.checkAuth, auth.isAdmin, adminController.getPastSubscribers);
 router.patch('/subscriptions/:subscriptionId/approve', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.approveSubscription);
+router.get('/all-daily-orders', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.getAllDailyOrders);
 
 
 router.post(

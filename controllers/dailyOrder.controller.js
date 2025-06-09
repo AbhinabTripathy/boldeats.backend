@@ -1,4 +1,4 @@
-const { DailyOrder, Subscription, User, Wallet } = require('../models');
+const { DailyOrder, Subscription, User, Wallet,Address } = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const sequelize = require('../config/db');
 const { Op } = require('sequelize');
@@ -23,7 +23,12 @@ dailyOrderController.getVendorDailyOrders = async (req, res) => {
                 include: [{
                     model: User,
                     as: 'Subscriber',
-                    attributes: ['name', 'phone_number']
+                    attributes: ['name', 'phone_number',],
+                    include:[{
+                        model:Address,
+                        as:"Addresses",
+                        attributes:['addressLine1' ,'addressLine2' ,'city' ,'state' ,'pincode']
+                    }]
                 }]
             }]
         });

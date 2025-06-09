@@ -677,4 +677,65 @@ vendorController.getVendorDashboard = async (req, res) => {
     }
   };
   
+// Get vendor details by ID
+vendorController.getVendorById = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+        
+        if (!vendorId) {
+            return res.error(HttpStatus.BAD_REQUEST, "false", "Vendor ID is required", []);
+        }
+        
+        // Find vendor with all related data
+        const vendor = await Vendor.findByPk(vendorId, {
+            include: [
+                {
+                    model: MenuSection,
+                    include: [{
+                        model: MenuItem,
+                        as: 'menuItems',
+                        attributes: ['id', 'dayOfWeek', 'items', 'isActive']
+                    }]
+                },
+                {
+                    model: MenuPhoto,
+                    attributes: ['id', 'photoUrl']
+                }
+            ],
+            attributes: {
+                exclude: ['password'] // Exclude password from response
+            }
+        });
+        
+        if (!vendor) {
+            return res.error(HttpStatus.NOT_FOUND, "false", "Vendor not found", []);
+        }
+        
+        // Format menu sections and items for better readability
+        const formattedVendor = {
+            ...vendor.toJSON(),
+            menuSections: vendor.menuSections.map(section => ({
+                id: section.id,
+                sectionName: section.sectionName,
+                menuType: section.menuType,
+                mealType: section.mealType,
+                menuItems: section.menuItems.map(item => ({
+                    id: item.id,
+                    dayOfWeek: item.dayOfWeek,
+                    items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items,
+                    isActive: item.isActive
+                }))
+            })),
+            menuPhotos: vendor.menuPhotos.map(photo => ({
+                id: photo.id,
+                photoUrl: photo.photoUrl
+            }))
+        };
+        
+        return res.success(HttpStatus.OK, "true", "Vendor details fetched successfully", formattedVendor);
+    } catch (error) {
+        return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
+    }
+};
+
 module.exports = vendorController;

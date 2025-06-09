@@ -14,5 +14,6 @@ router.delete('/delete/:id',authMiddleware.checkAuth,authMiddleware.isAdmin,vend
 router.get('/dashboard/:vendorId', vendorController.getVendorDashboard);
 router.get('/active-users/:vendorId', vendorController.getActiveUsersByVendor);
 router.get('/past-subscribers/:vendorId', vendorController.getPastSubscribers);
+router.get('/:vendorId', vendorController.getVendorById);
 
 module.exports = router;

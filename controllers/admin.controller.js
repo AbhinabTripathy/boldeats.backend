@@ -1,4 +1,4 @@
-const { User, Vendor, Cart, Payment,Subscription,Address } = require('../models');
+const { User, Vendor, Cart, Payment,Subscription,Address,DailyOrder } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const HttpStatus = require('../enums/httpStatusCode.enum');
@@ -265,4 +265,44 @@ adminController.approveSubscription = async (req, res) => {
       return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
   };
+
+//admin get all orderr details 
+
+adminController.getAllDailyOrders = async (req, res) => {
+  try {
+    const orders = await DailyOrder.findAll({
+      include: [
+        {
+          model: Subscription,
+          as: 'DailyOrderSubscription',
+          include: [
+            {
+              model: User,
+              as: 'Subscriber',
+              attributes: ['id', 'name', 'email', 'phone_number'],
+              include: [
+                {
+                  model: Address,
+                  as: 'Addresses',
+                  attributes: ['addressLine1','addressLine2', 'city', 'state', 'pincode']
+                }
+              ]
+            },
+            {
+              model: Vendor,
+              as: 'VendorSubscription',
+              attributes: ['id', 'name']
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return res.success(HttpStatus.OK, true, 'All daily orders fetched successfully', orders);
+  } catch (error) {
+    return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+  }
+};
+
 module.exports = adminController;
