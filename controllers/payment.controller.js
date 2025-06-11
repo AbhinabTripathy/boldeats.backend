@@ -122,19 +122,12 @@ exports.approvePayment = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
-
-
-
-
-
 // Get wallet balance
 exports.getWallet = async (req, res) => {
     const wallet = await Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet) return res.success(HttpStatus.OK, true, 'Wallet empty', { amount: 0 });
     return res.success(HttpStatus.OK, true, 'Wallet fetched', wallet);
 };
-
-
 // Get all payments for admin panel
 exports.getAllPayments = async (req, res) => {
     try {

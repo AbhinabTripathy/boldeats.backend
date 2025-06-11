@@ -36,6 +36,10 @@ const DailyOrder = sequelize.define('daily_orders', {
     reason: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    extendedSubscription: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     }
 });
 

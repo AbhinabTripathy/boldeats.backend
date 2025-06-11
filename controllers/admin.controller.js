@@ -142,10 +142,7 @@ adminController.getActiveUsers = async (req, res) => {
       console.error('Active users error:', error);
       return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
-  };
-  
-  
-
+};
 
 //get in active users................
 adminController.getUsers = async (req, res) => {

@@ -491,7 +491,7 @@ vendorController.listVendors = async (req, res) => {
     try {
         const vendors = await Vendor.findAll({
             attributes: {
-                exclude: ['password'] // Exclude password from the result
+                exclude: ['password'] 
             }
         });
         return res.success(HttpStatus.OK, "true", "Vendors retrieved successfully", vendors);
@@ -597,7 +597,7 @@ vendorController.getVendorDashboard = async (req, res) => {
       console.error(error);
       return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
-  };
+};
   
 
   vendorController.getActiveUsersByVendor = async (req, res) => {
@@ -616,24 +616,45 @@ vendorController.getVendorDashboard = async (req, res) => {
         ]
       });
   
-      const formatted = subscriptions.map(sub => ({
-        userId: `USER${String(sub.userId).padStart(3, '0')}`,
-        name: sub.Subscriber?.name || 'N/A',
-        vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
-        subscriptionType: sub.endDate && sub.startDate
-          ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days`
-          : 'N/A',
-        startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
-        pendingBalance: `₹${parseFloat(sub.amount).toFixed(2)}`,
-        countdown: 0
-      }));
+      // Process each subscription to get delivered order counts
+      const formattedResults = [];
+      
+      for (const sub of subscriptions) {
+        // Get all orders for this subscription
+        const allOrders = await DailyOrder.findAll({
+          where: { subscriptionId: sub.id }
+        });
+        
+        // Count delivered orders (Accepted status)
+        const deliveredOrders = allOrders.filter(order => order.status === 'Accepted').length;
+        
+        // Calculate total expected orders based on subscription duration
+        const totalDays = Math.ceil(
+          (new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24)
+        );
+        
+        // Calculate remaining orders (countdown)
+        const remainingOrders = totalDays - deliveredOrders;
+        
+        formattedResults.push({
+          userId: `USER${String(sub.userId).padStart(3, '0')}`,
+          name: sub.Subscriber?.name || 'N/A',
+          vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
+          subscriptionType: sub.endDate && sub.startDate
+            ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days`
+            : 'N/A',
+          startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+          pendingBalance: `₹${parseFloat(sub.amount).toFixed(2)}`,
+          countdown: remainingOrders
+        });
+      }
   
-      return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formatted);
+      return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formattedResults);
     } catch (error) {
       console.error('Active users by vendor error:', error);
       return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
-  };
+};
   
 
   vendorController.getPastSubscribers = async (req, res) => {
@@ -675,7 +696,7 @@ vendorController.getVendorDashboard = async (req, res) => {
       console.error('Vendor past subscribers error:', error);
       return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
-  };
+};
   
 // Get vendor details by ID
 vendorController.getVendorById = async (req, res) => {

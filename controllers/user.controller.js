@@ -114,7 +114,7 @@ userController.login = async (req, res) => {
                     { phone_number: email } // Allow login with phone number too
                 ]
             },
-            attributes: ['id', 'name', 'email', 'phone_number', 'password', 'role', 'isVerified', 'wallet_balance'] 
+            attributes: ['id', 'name', 'email', 'phone_number', 'password', 'role', 'isVerified'] 
         });
 
         if (!user) {
@@ -312,7 +312,7 @@ userController.getAllVendors = async (req, res) => {
                 'subscriptionPrice15Days', 'subscriptionPriceMonthly',
                 'mealTypes'
             ],
-            where: { isActive: true }  // Only get active vendors
+            where: { isActive: true }  
         });
 
         return res.success(
@@ -403,6 +403,7 @@ userController.getUserSubscription = async (req, res) => {
             include: [
                 {
                     model: Vendor,
+                    as:'Vendor',
                     attributes: [
                         'id', 'name', 'logo', 'phoneNumber', 'address',
                         'fssaiNumber', 'yearsInBusiness', 'openingTime',

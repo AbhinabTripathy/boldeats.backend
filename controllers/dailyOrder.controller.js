@@ -1,4 +1,4 @@
-const { DailyOrder, Subscription, User, Wallet,Address } = require('../models');
+const { DailyOrder, Subscription, User, Wallet,Address,Vendor } = require('../models');
 const HttpStatus = require('../enums/httpStatusCode.enum');
 const sequelize = require('../config/db');
 const { Op } = require('sequelize');
@@ -80,6 +80,7 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
         await order.save({ transaction: t });
 
         // If order is rejected or skipped, refund the daily amount to user's wallet
+        // and extend subscription by one day
         if (status === 'Rejected' || status === 'Skipped') {
             const wallet = await Wallet.findOne({
                 where: { userId: order.DailyOrderSubscription.Subscriber.id },
@@ -89,6 +90,19 @@ dailyOrderController.updateOrderStatus = async (req, res) => {
             if (wallet) {
                 wallet.amount += dailyAmount;
                 await wallet.save({ transaction: t });
+            }
+            
+            // Extend subscription end date by one day
+            const subscription = await Subscription.findByPk(order.subscriptionId, { transaction: t });
+            if (subscription) {
+                const currentEndDate = new Date(subscription.endDate);
+                currentEndDate.setDate(currentEndDate.getDate() + 1);
+                subscription.endDate = currentEndDate.toISOString().split('T')[0];
+                await subscription.save({ transaction: t });
+                
+                // Mark this order as having extended the subscription
+                order.extendedSubscription = true;
+                await order.save({ transaction: t });
             }
         }
 
@@ -147,6 +161,82 @@ dailyOrderController.createDailyOrders = async () => {
     } catch (error) {
         await t.rollback();
         console.error('Error creating daily orders:', error);
+    }
+};
+
+// Get subscription details with order history
+dailyOrderController.getSubscriptionDetails = async (req, res) => {
+    try {
+        const { subscriptionId } = req.params;
+        
+        const subscription = await Subscription.findByPk(subscriptionId, {
+            include: [
+                { 
+                    model: User, 
+                    as: 'Subscriber',
+                    attributes: ['id', 'name', 'email', 'phone_number']
+                },
+                { 
+                    model: Vendor, 
+                    as: 'VendorSubscription',
+                    attributes: ['id', 'name']
+                }
+            ]
+        });
+        
+        if (!subscription) {
+            return res.error(HttpStatus.NOT_FOUND, false, 'Subscription not found', []);
+        }
+        
+        // Get all orders for this subscription
+        const orders = await DailyOrder.findAll({
+            where: { subscriptionId },
+            order: [['date', 'DESC']]
+        });
+        
+        // Calculate subscription duration
+        const totalDays = Math.ceil(
+            (new Date(subscription.endDate) - new Date(subscription.startDate)) / (1000 * 60 * 60 * 24)
+        );
+        
+        // Count extended days
+        const extendedDays = orders.filter(order => order.extendedSubscription).length;
+        
+        // Format the response
+        const formattedResponse = {
+            userInformation: {
+                name: subscription.Subscriber.name,
+                id: `USER${String(subscription.userId).padStart(3, '0')}`,
+                vendorId: `VEND${String(subscription.vendorId).padStart(3, '0')}`
+            },
+            subscriptionSummary: {
+                duration: `${totalDays} days`,
+                amountPaid: `₹${parseFloat(subscription.amount).toFixed(2)}`
+            },
+            subscriptionPeriod: {
+                originalDates: {
+                    start: subscription.startDate,
+                    end: new Date(new Date(subscription.startDate).setDate(
+                        new Date(subscription.startDate).getDate() + totalDays - extendedDays - 1
+                    )).toISOString().split('T')[0]
+                },
+                adjustedDates: {
+                    start: subscription.startDate,
+                    end: subscription.endDate,
+                    extendedDays: extendedDays > 0 ? `(+${extendedDays} days)` : ''
+                }
+            },
+            orderHistory: orders.map(order => ({
+                date: order.date,
+                status: order.status,
+                reason: order.reason || '',
+                extended: order.extendedSubscription
+            }))
+        };
+        
+        return res.success(HttpStatus.OK, true, 'Subscription details fetched successfully', formattedResponse);
+    } catch (error) {
+        return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
 

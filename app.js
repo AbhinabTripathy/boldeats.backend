@@ -58,7 +58,6 @@ async function startServer() {
         await sequelize.authenticate();
         console.log('Database connection established successfully.');
         
-        // sync models with error handling like in your previous project
         try {
             // Temporarily disable foreign key checks
             await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
