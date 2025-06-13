@@ -165,3 +165,42 @@ exports.getAllPayments = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
+// Get user's payment status
+exports.getUserPayments = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Find all payments for the user
+        const payments = await Payment.findAll({
+            where: { userId },
+            include: [
+                { 
+                    model: Vendor,
+                    as: 'Vendor',  
+                    attributes: ['id', 'name'] 
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!payments || payments.length === 0) {
+            return res.success(HttpStatus.OK, true, 'No payments found', []);
+        }
+
+        const formattedPayments = payments.map(payment => ({
+            paymentId: payment.paymentId,
+            amount: payment.amount,
+            method: payment.method,
+            status: payment.status,
+            vendorName: payment.Vendor?.name || 'N/A',
+            createdAt: payment.createdAt,
+            receipt: payment.receipt
+        }));
+
+        return res.success(HttpStatus.OK, true, 'Payment status fetched successfully', formattedPayments);
+    } catch (error) {
+        console.error("getUserPayments error:", error);
+        return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+};
