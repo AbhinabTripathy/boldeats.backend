@@ -58,10 +58,17 @@ exports.uploadReceipt = async (req, res) => {
     });
 };
 
-// Admin approves payment
+// Admin approves or rejects payment
 exports.approvePayment = async (req, res) => {
     const { paymentId } = req.params;
+    const { status } = req.body; // expects 'Approved' or 'Rejected'
+
     const normalizedPaymentId = paymentId.toUpperCase();
+
+    // Validate input
+    if (!['Approved', 'Rejected'].includes(status)) {
+        return res.error(HttpStatus.BAD_REQUEST, false, 'Invalid status. Use "Approved" or "Rejected".', []);
+    }
 
     const payment = await Payment.findOne({
         where: {
@@ -77,6 +84,15 @@ exports.approvePayment = async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
+        if (status === 'Rejected') {
+            payment.status = 'Rejected';
+            await payment.save({ transaction: t });
+            await t.commit();
+            return res.success(HttpStatus.OK, true, 'Payment rejected successfully', []);
+        }
+
+        // ---- If status is Approved ----
+
         // 1. Mark payment as completed
         payment.status = 'Completed';
         await payment.save({ transaction: t });
@@ -122,6 +138,7 @@ exports.approvePayment = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
 // Get wallet balance
 exports.getWallet = async (req, res) => {
     const wallet = await Wallet.findOne({ where: { userId: req.user.id } });
