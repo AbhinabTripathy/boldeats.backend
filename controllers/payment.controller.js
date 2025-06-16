@@ -221,3 +221,85 @@ exports.getUserPayments = async (req, res) => {
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
     }
 };
+
+// Admin uploads payment screenshot for vendor
+exports.uploadVendorPaymentReceipt = async (req, res) => {
+    upload(req, res, async function (err) {
+        if (err) return res.error(HttpStatus.BAD_REQUEST, false, err.message, []);
+
+        const { vendorId, amount, userId } = req.body;
+
+        if (!vendorId || !amount || !userId || !req.file) {
+            return res.error(HttpStatus.BAD_REQUEST, false, 'All fields are required (vendorId, amount, userId, receipt)', []);
+        }
+
+        try {
+            // Verify the vendor exists
+            const vendor = await Vendor.findByPk(vendorId);
+            if (!vendor) {
+                return res.error(HttpStatus.NOT_FOUND, false, 'Vendor not found', []);
+            }
+
+            // Verify the user exists
+            const user = await User.findByPk(userId);
+            if (!user) {
+                return res.error(HttpStatus.NOT_FOUND, false, 'User not found', []);
+            }
+
+            // Create payment record
+            const payment = await Payment.create({
+                userId,
+                vendorId,
+                amount,
+                method: 'Admin Payment',
+                receipt: req.file.path,
+                status: 'Completed' // Auto-approve since admin is making the payment
+            });
+
+            return res.success(HttpStatus.CREATED, true, 'Vendor payment receipt uploaded successfully', payment);
+        } catch (error) {
+            console.error("uploadVendorPaymentReceipt error:", error);
+            return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+        }
+    });
+};
+
+// Get vendor payments - Updated to remove payment split columns
+exports.getVendorPayments = async (req, res) => {
+    try {
+        const vendorId = req.user.id;
+        
+        // Find all payments for the vendor
+        const payments = await Payment.findAll({
+            where: { vendorId },
+            include: [
+                { 
+                    model: User,
+                    as: 'User',  
+                    attributes: ['id', 'name'] 
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!payments || payments.length === 0) {
+            return res.success(HttpStatus.OK, true, 'No payments found', []);
+        }
+
+        const formattedPayments = payments.map(payment => ({
+            serialNumber: payment.id,
+            paymentId: payment.paymentId,
+            userId: payment.userId,
+            customerName: payment.User?.name || 'N/A',
+            amount: payment.amount,
+            method: payment.method,
+            status: payment.status,
+            receipt: payment.receipt
+        }));
+
+        return res.success(HttpStatus.OK, true, 'Vendor payments fetched successfully', formattedPayments);
+    } catch (error) {
+        console.error("getVendorPayments error:", error);
+        return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+    }
+};

@@ -5,7 +5,7 @@ const HttpStatus = require('../enums/httpStatusCode.enum');
 const ResponseMessages = require('../enums/responseMessages.enum');
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
-const { User, Vendor,Payment, MenuItem, MenuPhoto } = require('../models');
+const { User, Vendor,Payment, MenuItem, MenuPhoto ,Subscription } = require('../models');
 
 const userController = {};
 
@@ -403,7 +403,7 @@ userController.getUserSubscription = async (req, res) => {
             include: [
                 {
                     model: Vendor,
-                    as:'Vendor',
+                    as: 'Vendor',
                     attributes: [
                         'id', 'name', 'logo', 'phoneNumber', 'address',
                         'fssaiNumber', 'yearsInBusiness', 'openingTime',
@@ -419,10 +419,58 @@ userController.getUserSubscription = async (req, res) => {
             return res.success(200, true, 'No subscription found', null);
         }
 
+        // Find the subscription details
+        const subscription = await Subscription.findOne({
+            where: {
+                userId,
+                paymentId: payment.paymentId,
+                status: 'Active'
+            }
+        });
+
+        // Format meal types if it's stored as a string
+        let mealTypes = payment.Vendor?.mealTypes;
+        if (typeof mealTypes === 'string') {
+            try {
+                mealTypes = JSON.parse(mealTypes);
+            } catch (e) {
+                console.error('Error parsing mealTypes:', e);
+                // Keep as is if parsing fails
+            }
+        }
+
+        // Calculate subscription duration
+        let duration = '30 days';
+        if (subscription && subscription.startDate && subscription.endDate) {
+            const start = new Date(subscription.startDate);
+            const end = new Date(subscription.endDate);
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            duration = `${diffDays} days`;
+        }
+
         return res.success(200, true, 'Subscription fetched successfully', {
             planAmount: payment.amount,
             method: payment.method,
-            vendor: payment.vendor
+            vendor: {
+                id: payment.Vendor?.id,
+                name: payment.Vendor?.name,
+                logo: payment.Vendor?.logo,
+                address: payment.Vendor?.address,
+                phoneNumber: payment.Vendor?.phoneNumber,
+                yearsInBusiness: payment.Vendor?.yearsInBusiness,
+                openingTime: payment.Vendor?.openingTime,
+                closingTime: payment.Vendor?.closingTime,
+                rating: payment.Vendor?.rating
+            },
+            subscription: {
+                menuType: subscription?.menuType || payment.Vendor?.menuType,
+                mealTypes: mealTypes || [],
+                startDate: subscription?.startDate,
+                endDate: subscription?.endDate,
+                duration: duration,
+                status: subscription?.status || 'Active'
+            }
         });
     } catch (error) {
         console.error('Subscription fetch error:', error);

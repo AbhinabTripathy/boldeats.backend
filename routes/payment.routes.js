@@ -8,4 +8,10 @@ router.patch('/approve/:paymentId', authMiddleware.checkAuth, authMiddleware.isA
 router.get('/wallet', authMiddleware.checkAuth, paymentController.getWallet);
 router.get('/status', authMiddleware.checkAuth, paymentController.getUserPayments); 
 
+// for vendors to view payments made to them
+router.get('/vendor-payments', authMiddleware.checkAuth, paymentController.getVendorPayments);
+
+// NEW: for admin to upload payment screenshots for vendors
+router.post('/vendor-payment-receipt', authMiddleware.checkAuth, authMiddleware.isAdmin, paymentController.uploadVendorPaymentReceipt);
+
 module.exports = router;
