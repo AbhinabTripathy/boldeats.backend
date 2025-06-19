@@ -78,23 +78,35 @@ vendorController.addVendor = async (req, res) => {
                 accountHolderName, accountNumber, ifscCode, bankName,
                 branch, openingTime, closingTime,
                 subscriptionPrice15Days, subscriptionPriceMonthly,
-                yearsInBusiness, menuType, password,email
+                yearsInBusiness, password, email
             } = req.body;
-
-            // Parse mealTypes safely
-            let processedMealTypes = [];
-            try {
-                processedMealTypes = JSON.parse(req.body.mealTypes);
-            } catch (e) {
-                return res.error(HttpStatus.BAD_REQUEST, "false", "Invalid mealTypes JSON", []);
-            }
 
             // Parse menuSections safely
             let parsedMenuSections = [];
             try {
-                parsedMenuSections = JSON.parse(req.body.menuSections);
+                // Check if menuSections is already an array (might be pre-parsed by middleware)
+                if (Array.isArray(req.body.menuSections)) {
+                    parsedMenuSections = req.body.menuSections;
+                } else if (typeof req.body.menuSections === 'string') {
+                    // Try to parse as JSON string
+                    parsedMenuSections = JSON.parse(req.body.menuSections);
+                } else if (req.body.menuSections) {
+                    // If it's something else but defined, log and use as is
+                    console.log("menuSections is not a string or array:", typeof req.body.menuSections);
+                    parsedMenuSections = req.body.menuSections;
+                }
+                
+                // Validate that menuSections is an array
+                if (!Array.isArray(parsedMenuSections)) {
+                    console.warn("menuSections is not an array, converting to array");
+                    parsedMenuSections = [parsedMenuSections];
+                }
+                
+                // Log for debugging
+                console.log("Parsed menu sections:", JSON.stringify(parsedMenuSections));
             } catch (e) {
-                return res.error(HttpStatus.BAD_REQUEST, "false", "Invalid menuSections JSON", []);
+                console.error("Error parsing menuSections:", e, req.body.menuSections);
+                return res.error(HttpStatus.BAD_REQUEST, "false", "Invalid menuSections JSON: " + e.message, []);
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -104,6 +116,8 @@ vendorController.addVendor = async (req, res) => {
             const t = await sequelize.transaction();
 
             try {
+                // No need to determine menuType or mealTypes as they've been removed from the vendor model
+                
                 // Create vendor
                 const vendor = await Vendor.create({
                     name,
@@ -123,30 +137,70 @@ vendorController.addVendor = async (req, res) => {
                     subscriptionPrice15Days,
                     subscriptionPriceMonthly,
                     yearsInBusiness,
-                    menuType,
                     email,
-                    mealTypes: processedMealTypes,
                     password: hashedPassword
                 }, { transaction: t });
 
                 // Save menu sections & menu items
-                for (const section of parsedMenuSections) {
-                    const menuSection = await MenuSection.create({
-                        vendorId: vendor.id,
-                        sectionName: section.sectionName || 'MENU 1',
-                        menuType: section.menuType || vendor.menuType || 'both',
-                        mealType: section.mealType || (processedMealTypes.length > 0 ? processedMealTypes[0] : 'Lunch')
-                    }, { transaction: t });
-
-                    if (section.menuItems && Array.isArray(section.menuItems)) {
-                        for (const item of section.menuItems) {
-                            await MenuItem.create({
-                                menuSectionId: menuSection.id,
-                                vendorId: vendor.id,
-                                dayOfWeek: item.dayOfWeek,
-                                items: item.items
-                            }, { transaction: t });
+                console.log(`Processing ${parsedMenuSections.length} menu sections`);
+                
+                if (parsedMenuSections.length === 0) {
+                    console.warn("No menu sections to process");
+                }
+                
+                for (let i = 0; i < parsedMenuSections.length; i++) {
+                    try {
+                        const section = parsedMenuSections[i];
+                        console.log(`Processing section ${i+1}:`, JSON.stringify(section));
+                        
+                        if (!section) {
+                            console.error(`Section ${i+1} is undefined or null`);
+                            continue;
                         }
+                        
+                        // Ensure section has required properties
+                        const sectionName = section.sectionName || `MENU ${i+1}`;
+                        const menuType = section.menuType || 'both';
+                        const mealType = section.mealType || 'Lunch';
+                        
+                        console.log(`Creating section: ${sectionName}, type: ${menuType}, meal: ${mealType}`);
+                        
+                        const menuSection = await MenuSection.create({
+                            vendorId: vendor.id,
+                            sectionName: sectionName,
+                            menuType: menuType,
+                            mealType: mealType
+                        }, { transaction: t });
+                        
+                        console.log(`Created menu section with ID: ${menuSection.id}`);
+    
+                        if (section.menuItems && Array.isArray(section.menuItems)) {
+                            console.log(`Processing ${section.menuItems.length} menu items for section ${sectionName}`);
+                            
+                            for (const item of section.menuItems) {
+                                try {
+                                    if (!item.dayOfWeek) {
+                                        console.warn(`Menu item missing dayOfWeek, skipping: ${JSON.stringify(item)}`);
+                                        continue;
+                                    }
+                                    
+                                    await MenuItem.create({
+                                        menuSectionId: menuSection.id,
+                                        vendorId: vendor.id,
+                                        dayOfWeek: item.dayOfWeek,
+                                        items: item.items || []
+                                    }, { transaction: t });
+                                } catch (itemError) {
+                                    console.error(`Error creating menu item: ${itemError.message}`, item);
+                                    // Continue with next item instead of failing the whole transaction
+                                }
+                            }
+                        } else {
+                            console.log(`No menu items for section ${sectionName} or not an array`);
+                        }
+                    } catch (sectionError) {
+                        console.error(`Error processing section ${i+1}: ${sectionError.message}`);
+                        // Continue with next section instead of failing the whole transaction
                     }
                 }
 
@@ -170,11 +224,13 @@ vendorController.addVendor = async (req, res) => {
                         as: 'menuItems',
                         attributes: ['dayOfWeek', 'items']
                     }],
-                    attributes: ['sectionName']
+                    attributes: ['sectionName', 'menuType', 'mealType']
                 });
 
                 const formattedMenu = sections.map(section => ({
                     sectionName: section.sectionName,
+                    menuType: section.menuType,
+                    mealType: section.mealType,
                     menuItems: section.menuItems.map(item => ({
                         dayOfWeek: item.dayOfWeek,
                         items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items
@@ -183,16 +239,17 @@ vendorController.addVendor = async (req, res) => {
 
                 return res.success(HttpStatus.CREATED, "true", "Vendor added successfully", {
                     ...vendor.toJSON(),
-                    mealTypes: processedMealTypes,
                     menu: formattedMenu
                 });
 
             } catch (error) {
                 await t.rollback();
+                console.error("Vendor creation error:", error);
                 return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
             }
         });
     } catch (error) {
+        console.error("Outer vendor creation error:", error);
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
     }
 };
@@ -358,16 +415,8 @@ vendorController.updateVendor = async (req, res) => {
                 accountHolderName, accountNumber, ifscCode, bankName,
                 branch, openingTime, closingTime,
                 subscriptionPrice15Days, subscriptionPriceMonthly,
-                yearsInBusiness, menuType
+                yearsInBusiness
             } = req.body;
-
-            // Parse mealTypes safely
-            let processedMealTypes = [];
-            try {
-                processedMealTypes = JSON.parse(req.body.mealTypes);
-            } catch (e) {
-                processedMealTypes = [];
-            }
 
             // Parse menuSections safely
             let parsedMenuSections = [];
@@ -386,15 +435,15 @@ vendorController.updateVendor = async (req, res) => {
                     return res.error(HttpStatus.NOT_FOUND, "false", "Vendor not found", []);
                 }
 
+                // No need to determine menuType or mealTypes as they've been removed from the vendor model
+                
                 // Update vendor details
                 const updateData = {
                     name, phoneNumber, address, gstin, fssaiNumber,
                     accountHolderName, accountNumber, ifscCode, bankName,
                     branch, openingTime, closingTime,
                     subscriptionPrice15Days, subscriptionPriceMonthly,
-                    yearsInBusiness,
-                    menuType,
-                    mealTypes: processedMealTypes
+                    yearsInBusiness
                 };
 
                 // Update files if provided
@@ -418,8 +467,8 @@ vendorController.updateVendor = async (req, res) => {
                     const menuSection = await MenuSection.create({
                         vendorId: id,
                         sectionName: section.sectionName || 'MENU 1',
-                        menuType: section.menuType || vendor.menuType || 'both',
-                        mealType: section.mealType || (processedMealTypes.length > 0 ? processedMealTypes[0] : 'Lunch')
+                        menuType: section.menuType || 'both',
+                        mealType: section.mealType || 'Lunch'
                     }, { transaction: t });
 
                     if (section.menuItems && Array.isArray(section.menuItems)) {
@@ -472,7 +521,6 @@ vendorController.updateVendor = async (req, res) => {
 
                 return res.success(HttpStatus.OK, "true", "Vendor updated successfully", {
                     ...vendor.toJSON(),
-                    mealTypes: processedMealTypes,
                     menu: formattedMenu
                 });
 
@@ -489,13 +537,50 @@ vendorController.updateVendor = async (req, res) => {
 // List all vendors
 vendorController.listVendors = async (req, res) => {
     try {
+        // Get all vendors with basic info
         const vendors = await Vendor.findAll({
             attributes: {
                 exclude: ['password'] 
             }
         });
-        return res.success(HttpStatus.OK, "true", "Vendors retrieved successfully", vendors);
+        
+        // For each vendor, fetch their menu sections and items
+        const vendorsWithMenus = await Promise.all(vendors.map(async (vendor) => {
+            // Get menu sections with their items
+            const sections = await MenuSection.findAll({
+                where: { vendorId: vendor.id },
+                include: [{
+                    model: MenuItem,
+                    as: 'menuItems',
+                    attributes: ['dayOfWeek', 'items']
+                }],
+                attributes: ['sectionName', 'menuType', 'mealType']
+            });
+            
+            // Format menu sections and items
+            const formattedMenu = sections.map(section => ({
+                sectionName: section.sectionName,
+                menuType: section.menuType,
+                mealType: section.mealType,
+                menuItems: section.menuItems.map(item => ({
+                    dayOfWeek: item.dayOfWeek,
+                    items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items
+                }))
+            }));
+            
+            // Process vendor data
+            const vendorData = vendor.toJSON();
+            
+            // Return vendor with menu
+            return {
+                ...vendorData,
+                menu: formattedMenu
+            };
+        }));
+        
+        return res.success(HttpStatus.OK, "true", "Vendors retrieved successfully", vendorsWithMenus);
     } catch (error) {
+        console.error("Error listing vendors:", error);
         return res.error(HttpStatus.INTERNAL_SERVER_ERROR, "false", error.message, []);
     }
 };

@@ -92,15 +92,6 @@ const Vendor = sequelize.define('vendors', {
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
-    menuType: {
-        type: DataTypes.ENUM('Veg', 'Non-Veg', 'Both'),
-        allowNull: true
-    },
-    mealTypes: {
-        type: DataTypes.JSON, 
-        allowNull: true,
-        defaultValue: []
-    },
     password: {
         type: DataTypes.STRING,
         allowNull: false
