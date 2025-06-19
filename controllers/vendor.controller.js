@@ -526,29 +526,38 @@ vendorController.toggleVendorStatus = async (req, res) => {
 
 
 vendorController.deleteVendor = async (req, res, next) => {
-  try {
-    const vendorId = req.params.id;
-
-    const vendor = await Vendor.findByPk(vendorId);
-    if (!vendor) {
-      return res.status(404).json({
-        status: 404,
+    try {
+      const vendorId = req.params.id;
+  
+      const vendor = await Vendor.findByPk(vendorId);
+      if (!vendor) {
+        return res.status(404).json({
+          status: 404,
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+  
+      // Soft delete: mark inactive
+      vendor.isActive = false;
+      await vendor.save();
+  
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        message: 'Vendor marked as inactive successfully'
+      });
+    } catch (error) {
+      console.error("deleteVendor error:", error);
+      return res.status(500).json({
+        status: 500,
         success: false,
-        message: 'Vendor not found'
+        message: 'Internal Server Error',
+        error: error.message
       });
     }
-
-    await vendor.destroy();
-
-    return res.status(200).json({
-      status: 200,
-      success: true,
-      message: 'Vendor deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  };
+  
 
 vendorController.getVendorDashboard = async (req, res) => {
     try {
