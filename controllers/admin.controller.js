@@ -267,6 +267,26 @@ adminController.approveSubscription = async (req, res) => {
 
 adminController.getAllDailyOrders = async (req, res) => {
   try {
+    // First check if there are any daily orders
+    const orderCount = await DailyOrder.count();
+    console.log(`Found ${orderCount} daily orders`);
+    
+    // If no orders exist, check if there are any active subscriptions
+    if (orderCount === 0) {
+      const activeSubscriptions = await Subscription.count({
+        where: {
+          status: 'Active',
+          isAdminApproved: true
+        }
+      });
+      console.log(`Found ${activeSubscriptions} active and approved subscriptions`);
+      
+      // If no active subscriptions, return helpful message
+      if (activeSubscriptions === 0) {
+        return res.success(HttpStatus.OK, true, 'No daily orders found. There are no active and approved subscriptions.', []);
+      }
+    }
+    
     const orders = await DailyOrder.findAll({
       include: [
         {
@@ -298,6 +318,84 @@ adminController.getAllDailyOrders = async (req, res) => {
 
     return res.success(HttpStatus.OK, true, 'All daily orders fetched successfully', orders);
   } catch (error) {
+    console.error('Error fetching daily orders:', error);
+    return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
+  }
+};
+
+// Get all subscriptions for admin
+adminController.getAllSubscriptions = async (req, res) => {
+  try {
+    const subscriptions = await Subscription.findAll({
+      include: [
+        {
+          model: User,
+          as: 'Subscriber',
+          attributes: ['id', 'name', 'email', 'phone_number'],
+          include: [
+            {
+              model: Address,
+              as: 'Addresses',
+              attributes: ['addressLine1', 'addressLine2', 'city', 'state', 'pincode']
+            }
+          ]
+        },
+        {
+          model: Vendor,
+          as: 'VendorSubscription',
+          attributes: ['id', 'name']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Format the response data
+    const formattedSubscriptions = subscriptions.map(subscription => {
+      const sub = subscription.toJSON();
+      
+      // Calculate subscription duration in days
+      const durationInDays = sub.startDate && sub.endDate
+        ? Math.ceil((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))
+        : 'N/A';
+      
+      // Format user ID and vendor ID
+      const formattedUserId = `USER${String(sub.userId).padStart(3, '0')}`;
+      const formattedVendorId = sub.VendorSubscription
+        ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}`
+        : 'N/A';
+      
+      // Get default address if available
+      let defaultAddress = 'No address';
+      if (sub.Subscriber && sub.Subscriber.Addresses && sub.Subscriber.Addresses.length > 0) {
+        const address = sub.Subscriber.Addresses[0];
+        defaultAddress = `${address.addressLine1}, ${address.city}, ${address.state} - ${address.pincode}`;
+      }
+      
+      return {
+        id: sub.id,
+        userId: formattedUserId,
+        userName: sub.Subscriber ? sub.Subscriber.name : 'N/A',
+        userEmail: sub.Subscriber ? sub.Subscriber.email : 'N/A',
+        userPhone: sub.Subscriber ? sub.Subscriber.phone_number : 'N/A',
+        userAddress: defaultAddress,
+        vendorId: formattedVendorId,
+        vendorName: sub.VendorSubscription ? sub.VendorSubscription.name : 'N/A',
+        menuType: sub.menuType || 'N/A',
+        mealTypes: sub.mealTypes || [],
+        startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
+        endDate: sub.endDate ? new Date(sub.endDate).toISOString().split('T')[0] : 'N/A',
+        duration: `${durationInDays} days`,
+        amount: `₹${sub.amount}`,
+        status: sub.status,
+        isAdminApproved: sub.isAdminApproved,
+        createdAt: new Date(sub.createdAt).toLocaleString(),
+        updatedAt: new Date(sub.updatedAt).toLocaleString()
+      };
+    });
+
+    return res.success(HttpStatus.OK, true, 'All subscriptions fetched successfully', formattedSubscriptions);
+  } catch (error) {
+    console.error('Error fetching subscriptions:', error);
     return res.error(HttpStatus.INTERNAL_SERVER_ERROR, false, error.message, []);
   }
 };

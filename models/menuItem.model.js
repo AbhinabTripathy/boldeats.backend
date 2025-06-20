@@ -48,6 +48,10 @@ Vendor.hasMany(MenuItem, { foreignKey: 'vendorId', as: 'menuItems' });
 MenuItem.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'vendor' });
 
 MenuSection.hasMany(MenuItem, { foreignKey: 'menuSectionId' });
+
+// Define relationship with MenuPhoto
+MenuItem.hasMany(MenuPhoto, { foreignKey: 'menuItemId', as: 'menuPhotos' });
+MenuPhoto.belongsTo(MenuItem, { foreignKey: 'menuItemId', as: 'menuItem' });
 MenuItem.belongsTo(MenuSection, { foreignKey: 'menuSectionId' });
 
 // Add the association with MenuPhoto

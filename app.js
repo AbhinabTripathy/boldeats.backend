@@ -63,7 +63,7 @@ async function startServer() {
             await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
             
             // Change alter to false to prevent automatic schema changes
-            await sequelize.sync({ force: false, alter: true });
+            await sequelize.sync({ force: false, alter: false });
             console.log('Database tables synced successfully.');
             
             // Re-enable foreign key checks

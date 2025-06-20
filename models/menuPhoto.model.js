@@ -29,7 +29,7 @@ const MenuPhoto = sequelize.define('menuPhotos', {
 });
 
 // Define relationships
-Vendor.hasMany(MenuPhoto, { foreignKey: 'vendorId' });
+Vendor.hasMany(MenuPhoto, { foreignKey: 'vendorId', as: 'menuPhotos' });
 MenuPhoto.belongsTo(Vendor, { foreignKey: 'vendorId' });
 
 module.exports = MenuPhoto;

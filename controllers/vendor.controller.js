@@ -345,7 +345,6 @@ vendorController.login = async (req, res) => {
 };
 
 //for based on the meal type ............................
-
 vendorController.getMenuByMealType = async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -435,7 +434,6 @@ vendorController.updateVendor = async (req, res) => {
                     return res.error(HttpStatus.NOT_FOUND, "false", "Vendor not found", []);
                 }
 
-                // No need to determine menuType or mealTypes as they've been removed from the vendor model
                 
                 // Update vendor details
                 const updateData = {

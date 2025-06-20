@@ -296,21 +296,28 @@ userController.updateProfile = async (req, res) => {
 // Get all vendors with their menu items
 userController.getAllVendors = async (req, res) => {
     try {
+        // Include both menu items and menu photos directly associated with the vendor
         const vendors = await Vendor.findAll({
-            include: [{
-                model: MenuItem,
-                as: 'menuItems',  
-                include: [{
+            include: [
+                {
+                    model: MenuItem,
+                    as: 'menuItems',
+                    include: [{
+                        model: MenuPhoto,
+                        as: 'menuPhotos'
+                    }]
+                },
+                {
                     model: MenuPhoto,
-                    as: 'menuPhotos' 
-                }]
-            }],
+                    as: 'menuPhotos',
+                    required: false
+                }
+            ],
             attributes: [
                 'id', 'name', 'logo', 'phoneNumber', 'address',
                 'fssaiNumber', 'yearsInBusiness', 'openingTime',
-                'closingTime', 'menuType', 'rating',
-                'subscriptionPrice15Days', 'subscriptionPriceMonthly',
-                'mealTypes'
+                'closingTime', 'rating',
+                'subscriptionPrice15Days', 'subscriptionPriceMonthly'
             ],
             where: { isActive: true }  
         });
@@ -347,9 +354,8 @@ userController.getVendorDetails = async (req, res) => {
             attributes: [
                 'id', 'name', 'logo', 'phoneNumber', 'address',
                 'fssaiNumber', 'yearsInBusiness', 'openingTime',
-                'closingTime', 'menuType', 'rating',
-                'subscriptionPrice15Days', 'subscriptionPriceMonthly',
-                'mealTypes'
+                'closingTime', 'rating',
+                'subscriptionPrice15Days', 'subscriptionPriceMonthly'
             ]
         });
 
@@ -361,16 +367,8 @@ userController.getVendorDetails = async (req, res) => {
             );
         }
 
-        // Parse mealTypes if it's a string
+        // Get vendor data
         const vendorData = vendor.toJSON();
-        if (typeof vendorData.mealTypes === 'string') {
-            try {
-                vendorData.mealTypes = JSON.parse(vendorData.mealTypes);
-            } catch (e) {
-                console.error('Error parsing mealTypes:', e);
-                // Keep as is if parsing fails
-            }
-        }
 
         return res.success(
             HttpStatus.OK,

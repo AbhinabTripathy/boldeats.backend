@@ -17,10 +17,16 @@ router.get('/dashboard', authMiddleware.checkAuth, authMiddleware.isAdmin, admin
 // Payment management routes
 router.get('/payments', authMiddleware.checkAuth, authMiddleware.isAdmin, paymentController.getAllPayments);
 router.patch('/payments/:paymentId/approve', authMiddleware.checkAuth, authMiddleware.isAdmin, paymentController.approvePayment);
+// User management routes
 router.get('/users/active', auth.checkAuth, auth.isAdmin, adminController.getActiveUsers);
 router.get('/users', auth.checkAuth, auth.isAdmin, adminController.getUsers);
 router.get('/users/past-subscribers', auth.checkAuth, auth.isAdmin, adminController.getPastSubscribers);
+
+// Subscription management routes
+router.get('/subscriptions', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.getAllSubscriptions);
 router.patch('/subscriptions/:subscriptionId/approve', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.approveSubscription);
+
+// Daily order management routes
 router.get('/all-daily-orders', authMiddleware.checkAuth, authMiddleware.isAdmin, adminController.getAllDailyOrders);
 
 
