@@ -829,7 +829,7 @@ delete vendorJson.menuSections;
 
 const formattedVendor = {
     ...vendorJson,
-        Menu: vendor.menuSections.map(section => ({
+        menu: vendor.menuSections.map(section => ({
         id: section.id,
         sectionName: section.sectionName,
         menuType: section.menuType,

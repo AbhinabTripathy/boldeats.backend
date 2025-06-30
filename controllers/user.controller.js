@@ -405,9 +405,9 @@ userController.getUserSubscription = async (req, res) => {
                     attributes: [
                         'id', 'name', 'logo', 'phoneNumber', 'address',
                         'fssaiNumber', 'yearsInBusiness', 'openingTime',
-                        'closingTime', 'menuType', 'rating',
+                        'closingTime', 'rating',
                         'subscriptionPrice15Days', 'subscriptionPriceMonthly',
-                        'mealTypes'
+                        
                     ]
                 }
             ]
@@ -463,7 +463,7 @@ userController.getUserSubscription = async (req, res) => {
             },
             subscription: {
                 menuType: subscription?.menuType || payment.Vendor?.menuType,
-                mealTypes: mealTypes || [],
+                mealTypes: subscription?.mealTypes || payment.Vendor?.mealTypes,
                 startDate: subscription?.startDate,
                 endDate: subscription?.endDate,
                 duration: duration,
