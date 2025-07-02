@@ -251,7 +251,7 @@ exports.uploadVendorPaymentReceipt = async (req, res) => {
                 userId,
                 vendorId,
                 amount,
-                method: 'Admin Payment',
+                //method: 'Admin Payment',
                 receipt: req.file.path,
                 status: 'Completed' // Auto-approve since admin is making the payment
             });
