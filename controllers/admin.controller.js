@@ -121,7 +121,7 @@ adminController.getActiveUsers = async (req, res) => {
       const subscriptions = await Subscription.findAll({
         include: [
           { model: User, as: 'Subscriber', attributes: ['id', 'name', 'email', 'phone_number'] },
-          { model: Vendor, as: 'VendorSubscription', attributes: ['id', 'name'] }
+          { model: Vendor, as: 'VendorSubscription', attributes: ['id', 'name' ,'logo'] }
         ]
       });
   
@@ -129,12 +129,16 @@ adminController.getActiveUsers = async (req, res) => {
         userId: `USER${String(sub.userId).padStart(3, '0')}`,
         name: sub.Subscriber ? sub.Subscriber.name : 'N/A',
         vendorId: sub.VendorSubscription ? `VEND${String(sub.VendorSubscription.id).padStart(3, '0')}` : 'N/A',
+        vendorName: sub.VendorSubscription ? sub.VendorSubscription.name : 'N/A', 
+        vendorLogo: sub.VendorSubscription ? sub.VendorSubscription.logo : null, 
         subscriptionType: sub.endDate && sub.startDate
           ? `${Math.round((new Date(sub.endDate) - new Date(sub.startDate)) / (1000 * 60 * 60 * 24))} days`
           : 'N/A',
         startDate: sub.startDate ? new Date(sub.startDate).toISOString().split('T')[0] : 'N/A',
         pendingBalance: `₹${sub.amount}`,
-        countdown: 0
+        countdown: 0,
+        
+        
       }));
   
       return res.success(HttpStatus.OK, true, 'Active users fetched successfully', formatted);
